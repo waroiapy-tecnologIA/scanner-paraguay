@@ -54,6 +54,10 @@
         #perspCanvas { touch-action: none; cursor: crosshair; border-radius: 12px; max-width: 95vw; max-height: 65vh; display: block; }
         .persp-btns { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
         .persp-btns button { padding: 10px 20px; font-size: 0.9rem; }
+        .img-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
+        .queue-item { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .queue-controls { display: flex; gap: 4px; }
+        .queue-controls button { padding: 4px 8px; font-size: 0.7rem; }
     </style>
 </head>
 <body>
@@ -118,12 +122,12 @@
             <div id="rejectedUsersList">Cargando...</div>
         </div>
 
-        <!-- HERRAMIENTAS PDF DEL ADMIN -->
+        <!-- HERRAMIENTAS PDF DEL ADMIN (ahora con sistema de cola de imágenes) -->
         <div class="card" style="border:2px solid #1e3c72;">
             <h2 style="color:#1e3c72;">🛠️ Mis herramientas PDF</h2>
 
             <div class="tool-section">
-                <div style="font-weight:bold;">📸 Foto / Imagen a PDF</div>
+                <div style="font-weight:bold;">📸 Foto / Imagen a PDF (múltiples capturas)</div>
                 <div class="btn-group">
                     <label class="file-input-label" style="background:#2c7a4d;">📷 Cámara
                         <input type="file" id="cameraInputA" accept="image/*" capture="environment" style="display:none;">
@@ -132,8 +136,9 @@
                         <input type="file" id="galleryInputA" accept="image/*" style="display:none;">
                     </label>
                 </div>
-                <button id="convertBtnA">📑 Convertir a PDF</button>
-                <div class="preview-area" id="previewA">🖼️ Vista previa</div>
+                <button id="clearQueueA" class="btn-secondary">🗑️ Vaciar lista</button>
+                <div class="preview-area" id="previewA">🖼️ No hay imágenes</div>
+                <button id="convertBtnA" style="margin-top:10px;">📑 Convertir todas a PDF</button>
                 <div class="status" id="statusImgA"></div>
             </div>
 
@@ -174,7 +179,7 @@
     <!-- FUNCIONES USUARIO NORMAL -->
     <div id="appFunctions" style="display:none;">
         <div class="card">
-            <div style="font-weight:bold;">📸 Foto / Imagen a PDF</div>
+            <div style="font-weight:bold;">📸 Foto / Imagen a PDF (múltiples capturas)</div>
             <div class="btn-group">
                 <label class="file-input-label" style="background:#2c7a4d;">📷 Cámara
                     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
@@ -183,8 +188,9 @@
                     <input type="file" id="galleryInput" accept="image/*" style="display:none;">
                 </label>
             </div>
-            <button id="convertToPdfBtn">📑 Convertir imagen a PDF</button>
-            <div class="preview-area" id="imagePreviewArea">🖼️ Vista previa</div>
+            <button id="clearQueue" class="btn-secondary">🗑️ Vaciar lista</button>
+            <div class="preview-area" id="imagePreviewArea">🖼️ No hay imágenes</div>
+            <button id="convertToPdfBtn" style="margin-top:10px;">📑 Convertir todas a PDF</button>
             <div class="status" id="imgStatus"></div>
         </div>
         <div class="card">
@@ -225,18 +231,23 @@
     <p>Arrastra los 4 puntos naranjas a las esquinas del documento</p>
     <canvas id="perspCanvas"></canvas>
     <div class="persp-btns">
-        <button id="perspOkBtn">✅ Aplicar y convertir</button>
+        <button id="perspOkBtn">✅ Aplicar y continuar</button>
         <button id="perspSkipBtn" class="btn-secondary">⏭️ Sin corrección</button>
-        <button id="perspCancelBtn" style="background:#dc2626;">✖ Cancelar</button>
+        <button id="perspCancelBtn" style="background:#dc2626;">✖ Cancelar todo</button>
     </div>
 </div>
 
 <script>
-    // TAMAÑO DE PÁGINA PERSONALIZADO: 211,6 mm x 320,1 mm (21,16 cm x 32,01 cm)
+    // ==================== CONFIGURACIÓN ====================
     const PAGE_WIDTH_MM = 211.6;
     const PAGE_HEIGHT_MM = 320.1;
-
     const ADMIN_EMAIL = "waroiapy@gmail.com";
+
+    // Colas de imágenes (separadas para usuario normal y admin)
+    let imageQueue = [];      // usuario normal
+    let imageQueueA = [];     // admin
+
+    // Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyCkoMbTG4L51DaavwC6Tis3ebFm6MWNZ7s",
         authDomain: "scanner-pdf-pro-efff9.firebaseapp.com",
@@ -250,7 +261,7 @@
     const db = firebase.firestore();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    let currentUser = null, isAdmin = false, userData = null;
+    // Referencias DOM frecuentes
     const authFormsDiv = document.getElementById('authForms');
     const userInfoDiv = document.getElementById('userInfo');
     const appFunctionsDiv = document.getElementById('appFunctions');
@@ -260,46 +271,48 @@
     const authMessage = document.getElementById('authMessage');
     const adminBadgeContainer = document.getElementById('adminBadgeContainer');
 
-    // ============================================================
-    // CORRECCIÓN DE PERSPECTIVA (canvas interactivo)
-    // ============================================================
+    // Variables de autenticación
+    let currentUser = null, isAdmin = false, userData = null;
+
+    // ==================== CORRECCIÓN DE PERSPECTIVA ====================
     const perspModal = document.getElementById('perspModal');
     const perspCanvas = document.getElementById('perspCanvas');
     const ctx = perspCanvas.getContext('2d');
+    let perspImage = null, perspScale = 1, perspPoints = [];
+    let draggingIdx = -1, perspResolve = null;  // promesa para el resultado
 
-    let perspImage = null;       // HTMLImageElement original
-    let perspScale = 1;          // escala de display
-    let perspPoints = [];        // 4 puntos en coordenadas de display
-    let draggingIdx = -1;
-    let perspCallback = null;    // función a llamar con el dataURL corregido
+    function abrirPerspectiva(imgElement) {
+        return new Promise((resolve) => {
+            perspImage = imgElement;
+            perspResolve = resolve;
+            const maxW = Math.min(window.innerWidth * 0.95, 560);
+            const maxH = window.innerHeight * 0.65;
+            perspScale = Math.min(maxW / imgElement.naturalWidth, maxH / imgElement.naturalHeight);
+            perspCanvas.width = Math.round(imgElement.naturalWidth * perspScale);
+            perspCanvas.height = Math.round(imgElement.naturalHeight * perspScale);
+            const m = 20, w = perspCanvas.width, h = perspCanvas.height;
+            perspPoints = [
+                { x: m, y: m },
+                { x: w - m, y: m },
+                { x: w - m, y: h - m },
+                { x: m, y: h - m }
+            ];
+            dibujarPerspCanvas();
+            perspModal.classList.add('activo');
+        });
+    }
 
-    function abrirPerspectiva(imgElement, callback) {
-        perspImage = imgElement;
-        perspCallback = callback;
-
-        const maxW = Math.min(window.innerWidth * 0.95, 560);
-        const maxH = window.innerHeight * 0.65;
-        perspScale = Math.min(maxW / imgElement.naturalWidth, maxH / imgElement.naturalHeight);
-        perspCanvas.width = Math.round(imgElement.naturalWidth * perspScale);
-        perspCanvas.height = Math.round(imgElement.naturalHeight * perspScale);
-
-        const m = 20;
-        const w = perspCanvas.width, h = perspCanvas.height;
-        perspPoints = [
-            { x: m,     y: m },
-            { x: w - m, y: m },
-            { x: w - m, y: h - m },
-            { x: m,     y: h - m }
-        ];
-
-        dibujarPerspCanvas();
-        perspModal.classList.add('activo');
+    function cerrarPerspectiva(dataUrl, cancelado = false) {
+        perspModal.classList.remove('activo');
+        if (perspResolve) {
+            perspResolve(cancelado ? null : dataUrl);
+            perspResolve = null;
+        }
     }
 
     function dibujarPerspCanvas() {
         ctx.clearRect(0, 0, perspCanvas.width, perspCanvas.height);
         ctx.drawImage(perspImage, 0, 0, perspCanvas.width, perspCanvas.height);
-
         ctx.beginPath();
         ctx.moveTo(perspPoints[0].x, perspPoints[0].y);
         for (let i = 1; i < 4; i++) ctx.lineTo(perspPoints[i].x, perspPoints[i].y);
@@ -309,7 +322,6 @@
         ctx.strokeStyle = '#1e3c72';
         ctx.lineWidth = 2;
         ctx.stroke();
-
         ctx.setLineDash([4, 4]);
         ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.beginPath();
@@ -319,28 +331,20 @@
         ctx.lineTo(perspPoints[3].x, perspPoints[3].y);
         ctx.stroke();
         ctx.setLineDash([]);
-
         const labels = ['↖', '↗', '↘', '↙'];
         perspPoints.forEach((p, i) => {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
-            ctx.fillStyle = '#f59e0b';
-            ctx.fill();
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.beginPath(); ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
+            ctx.fillStyle = '#f59e0b'; ctx.fill();
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = 'white'; ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(labels[i], p.x, p.y);
         });
     }
 
     function getPerspPos(e) {
         const rect = perspCanvas.getBoundingClientRect();
-        const scaleX = perspCanvas.width / rect.width;
-        const scaleY = perspCanvas.height / rect.height;
+        const scaleX = perspCanvas.width / rect.width, scaleY = perspCanvas.height / rect.height;
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
@@ -348,8 +352,7 @@
 
     function encontrarPunto(pos) {
         for (let i = 0; i < perspPoints.length; i++) {
-            const dx = perspPoints[i].x - pos.x;
-            const dy = perspPoints[i].y - pos.y;
+            const dx = perspPoints[i].x - pos.x, dy = perspPoints[i].y - pos.y;
             if (Math.sqrt(dx*dx + dy*dy) < 30) return i;
         }
         return -1;
@@ -374,20 +377,17 @@
     perspCanvas.addEventListener('touchend', () => { draggingIdx = -1; });
 
     function distancia(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
-    function calcularHomografia(src, dst) {
+    function calcularHomografia(src, dst) { /* ... igual que antes ... */
         const A = [];
         for (let i = 0; i < 4; i++) {
-            const sx = src[i].x, sy = src[i].y;
-            const dx = dst[i].x, dy = dst[i].y;
+            const sx = src[i].x, sy = src[i].y, dx = dst[i].x, dy = dst[i].y;
             A.push([-sx, -sy, -1, 0, 0, 0, sx*dx, sy*dx, dx]);
             A.push([0, 0, 0, -sx, -sy, -1, sx*dy, sy*dy, dy]);
         }
         const n = 8;
         for (let col = 0; col < n; col++) {
             let maxRow = col;
-            for (let row = col+1; row < 8; row++) {
-                if (Math.abs(A[row][col]) > Math.abs(A[maxRow][col])) maxRow = row;
-            }
+            for (let row = col+1; row < 8; row++) if (Math.abs(A[row][col]) > Math.abs(A[maxRow][col])) maxRow = row;
             [A[col], A[maxRow]] = [A[maxRow], A[col]];
             for (let row = col+1; row < 8; row++) {
                 const f = A[row][col] / A[col][col];
@@ -414,12 +414,10 @@
         const src = pts;
         const dst = [{ x: 0, y: 0 }, { x: ancho, y: 0 }, { x: ancho, y: alto }, { x: 0, y: alto }];
         const outCanvas = document.createElement('canvas');
-        outCanvas.width = ancho;
-        outCanvas.height = alto;
+        outCanvas.width = ancho; outCanvas.height = alto;
         const outCtx = outCanvas.getContext('2d');
         const tmpCanvas = document.createElement('canvas');
-        tmpCanvas.width = perspImage.naturalWidth;
-        tmpCanvas.height = perspImage.naturalHeight;
+        tmpCanvas.width = perspImage.naturalWidth; tmpCanvas.height = perspImage.naturalHeight;
         const tmpCtx = tmpCanvas.getContext('2d');
         tmpCtx.drawImage(perspImage, 0, 0);
         const srcData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
@@ -428,8 +426,7 @@
         for (let y = 0; y < alto; y++) {
             for (let x = 0; x < ancho; x++) {
                 const srcPt = aplicarH(H, x, y);
-                const sx = Math.round(srcPt.x);
-                const sy = Math.round(srcPt.y);
+                const sx = Math.round(srcPt.x), sy = Math.round(srcPt.y);
                 if (sx >= 0 && sx < tmpCanvas.width && sy >= 0 && sy < tmpCanvas.height) {
                     const si = (sy * tmpCanvas.width + sx) * 4;
                     const di = (y * ancho + x) * 4;
@@ -444,76 +441,32 @@
         return outCanvas.toDataURL('image/jpeg', 0.92);
     }
 
-    // ============================================================
-    // MARCA DE AGUA adaptada al nuevo tamaño
-    // ============================================================
+    document.getElementById('perspOkBtn').onclick = () => {
+        const corregida = aplicarPerspectiva();
+        cerrarPerspectiva(corregida);
+    };
+    document.getElementById('perspSkipBtn').onclick = () => {
+        // devolver la imagen original sin modificar
+        const canvas = document.createElement('canvas');
+        canvas.width = perspImage.naturalWidth; canvas.height = perspImage.naturalHeight;
+        canvas.getContext('2d').drawImage(perspImage, 0, 0);
+        cerrarPerspectiva(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    document.getElementById('perspCancelBtn').onclick = () => {
+        cerrarPerspectiva(null, true);
+    };
+
+    // ==================== FUNCIONES PDF COMUNES ====================
     function agregarMarcaAgua(pdf) {
         const total = pdf.internal.getNumberOfPages();
         for (let i = 1; i <= total; i++) {
             pdf.setPage(i);
-            const w = pdf.internal.pageSize.getWidth();
-            const h = pdf.internal.pageSize.getHeight();
-            pdf.setFontSize(7);
-            pdf.setTextColor(180, 180, 180);
+            const w = pdf.internal.pageSize.getWidth(), h = pdf.internal.pageSize.getHeight();
+            pdf.setFontSize(7); pdf.setTextColor(180, 180, 180);
             pdf.text('waro-ia \u00AE', w - 4, h - 3, { align: 'right' });
         }
     }
 
-    // ============================================================
-    // CONVERSIÓN A PDF CON TAMAÑO FIJO Y SIN ESTIRAMIENTO
-    // ============================================================
-    function convertirDataUrlAPdf(dataUrl, statusEl) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-                try {
-                    const { jsPDF } = window.jspdf;
-                    const pdf = new jsPDF({
-                        unit: 'mm',
-                        format: [PAGE_WIDTH_MM, PAGE_HEIGHT_MM]
-                    });
-                    const pageWidth = PAGE_WIDTH_MM;
-                    const pageHeight = PAGE_HEIGHT_MM;
-                    
-                    const imgWidthPx = img.width;
-                    const imgHeightPx = img.height;
-                    const ratio = Math.min(pageWidth / imgWidthPx, pageHeight / imgHeightPx);
-                    const drawWidth = imgWidthPx * ratio;
-                    const drawHeight = imgHeightPx * ratio;
-                    const x = (pageWidth - drawWidth) / 2;
-                    const y = (pageHeight - drawHeight) / 2;
-                    
-                    pdf.addImage(dataUrl, 'JPEG', x, y, drawWidth, drawHeight, undefined, 'FAST');
-                    agregarMarcaAgua(pdf);
-                    pdf.save(`scan_${Date.now()}.pdf`);
-                    statusEl.innerText = "✅ PDF descargado. Puedes capturar otra imagen.";
-                    resolve();
-                } catch(err) { reject(err); }
-            };
-            img.onerror = reject;
-            img.src = dataUrl;
-        });
-    }
-
-    // Helper para abrir perspectiva y convertir
-    function abrirPerspYConvertir(imgElement, statusEl, previewEl) {
-        abrirPerspectiva(imgElement, async (dataUrl, corregido) => {
-            statusEl.innerHTML = '<span class="spinner"></span> Generando PDF...';
-            if (corregido) {
-                previewEl.innerHTML = `<img src="${dataUrl}" style="max-width:100%;max-height:180px;border-radius:12px;"><br>✅ Perspectiva corregida`;
-            }
-            try {
-                await convertirDataUrlAPdf(dataUrl, statusEl);
-                // Limpiar los inputs de archivo para permitir captura continua del mismo archivo
-                const cameraInputs = document.querySelectorAll('input[type="file"][accept*="image"]');
-                cameraInputs.forEach(input => { input.value = ''; });
-            } catch(err) { statusEl.innerText = "Error: " + err.message; }
-        });
-    }
-
-    // ============================================================
-    // FUNCIONES PDF ADICIONALES (unir, dividir, comprimir)
-    // ============================================================
     async function unirPdfs(files, statusEl) {
         if (files.length < 2) { alert("Selecciona al menos 2 PDFs."); return; }
         statusEl.innerHTML = '<span class="spinner"></span> Uniendo...';
@@ -532,8 +485,7 @@
             for (const page of pages) {
                 const { width, height } = page.getSize();
                 page.drawText('waro-ia \u00AE', {
-                    x: width - 52, y: 8,
-                    size: 7, font: helvetica,
+                    x: width - 52, y: 8, size: 7, font: helvetica,
                     color: rgb(0.7, 0.7, 0.7), opacity: 0.7
                 });
             }
@@ -562,8 +514,7 @@
             for (const page of outPages) {
                 const { width, height } = page.getSize();
                 page.drawText('waro-ia \u00AE', {
-                    x: width - 52, y: 8,
-                    size: 7, font: helvetica,
+                    x: width - 52, y: 8, size: 7, font: helvetica,
                     color: rgb(0.7, 0.7, 0.7), opacity: 0.7
                 });
             }
@@ -579,7 +530,6 @@
         try {
             const pdf = await pdfjsLib.getDocument({ data: buffer.slice(0) }).promise;
             const { jsPDF } = window.jspdf;
-            // Usar el mismo tamaño de página personalizado
             const newPdf = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH_MM, PAGE_HEIGHT_MM] });
             for (let i = 1; i <= pdf.numPages; i++) {
                 statusEl.innerHTML = `<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`;
@@ -589,13 +539,10 @@
                 canvas.width = viewport.width; canvas.height = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 const imgData = canvas.toDataURL('image/jpeg', 0.3);
-                const pageWidth = PAGE_WIDTH_MM;
-                const pageHeight = PAGE_HEIGHT_MM;
+                const pageWidth = PAGE_WIDTH_MM, pageHeight = PAGE_HEIGHT_MM;
                 const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-                const drawWidth = canvas.width * ratio;
-                const drawHeight = canvas.height * ratio;
-                const x = (pageWidth - drawWidth) / 2;
-                const y = (pageHeight - drawHeight) / 2;
+                const drawWidth = canvas.width * ratio, drawHeight = canvas.height * ratio;
+                const x = (pageWidth - drawWidth) / 2, y = (pageHeight - drawHeight) / 2;
                 if (i > 1) newPdf.addPage();
                 newPdf.addImage(imgData, 'JPEG', x, y, drawWidth, drawHeight);
             }
@@ -608,9 +555,98 @@
         } catch(err) { statusEl.innerText = "Error: " + err.message; console.error(err); }
     }
 
-    // ============================================================
-    // PANTALLAS Y AUTENTICACIÓN (sin cambios)
-    // ============================================================
+    // ==================== GESTIÓN DE COLA DE IMÁGENES ====================
+    function agregarImagen(file, queue, previewContainerId) {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            queue.push({ dataUrl: url, name: file.name || 'captura', element: img });
+            renderizarCola(queue, previewContainerId);
+        };
+        img.src = url;
+    }
+
+    function renderizarCola(queue, containerId) {
+        const container = document.getElementById(containerId);
+        if (queue.length === 0) {
+            container.innerHTML = '🖼️ No hay imágenes';
+            return;
+        }
+        container.innerHTML = queue.map((img, idx) => `
+            <div class="queue-item">
+                <img src="${img.dataUrl}" class="img-thumb">
+                <div style="flex:1; font-size:0.85rem; word-break:break-all;">${img.name}</div>
+                <div class="queue-controls">
+                    <button class="btn-up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>▲</button>
+                    <button class="btn-down" data-idx="${idx}" ${idx === queue.length-1 ? 'disabled' : ''}>▼</button>
+                    <button class="btn-remove" data-idx="${idx}" style="background:#dc2626; color:white;">✕</button>
+                </div>
+            </div>
+        `).join('') + `<div style="font-size:0.8rem; color:#6b7280; margin-top:8px;">Total: ${queue.length} imagen(es)</div>`;
+
+        container.querySelectorAll('.btn-up').forEach(btn => {
+            btn.onclick = () => {
+                const i = parseInt(btn.dataset.idx);
+                if (i > 0) {
+                    [queue[i-1], queue[i]] = [queue[i], queue[i-1]];
+                    renderizarCola(queue, containerId);
+                }
+            };
+        });
+        container.querySelectorAll('.btn-down').forEach(btn => {
+            btn.onclick = () => {
+                const i = parseInt(btn.dataset.idx);
+                if (i < queue.length - 1) {
+                    [queue[i], queue[i+1]] = [queue[i+1], queue[i]];
+                    renderizarCola(queue, containerId);
+                }
+            };
+        });
+        container.querySelectorAll('.btn-remove').forEach(btn => {
+            btn.onclick = () => {
+                const i = parseInt(btn.dataset.idx);
+                queue.splice(i, 1);
+                renderizarCola(queue, containerId);
+            };
+        });
+    }
+
+    // Función para convertir la cola completa a PDF (con perspectiva opcional por imagen)
+    async function convertirColaAPdf(queue, statusEl, previewContainerId) {
+        if (queue.length === 0) {
+            alert('Agrega al menos una imagen');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH_MM, PAGE_HEIGHT_MM] });
+        const total = queue.length;
+        for (let i = 0; i < total; i++) {
+            statusEl.innerHTML = `<span class="spinner"></span> Procesando imagen ${i+1} de ${total}...`;
+            const imgObj = queue[i];
+            // Pedir corrección de perspectiva para cada una
+            const dataUrlCorregida = await abrirPerspectiva(imgObj.element);
+            if (dataUrlCorregida === null) { // cancelado
+                statusEl.innerText = '❌ Conversión cancelada';
+                return;
+            }
+            const img = new Image();
+            await new Promise(resolve => { img.onload = resolve; img.src = dataUrlCorregida; });
+            if (i > 0) pdf.addPage();
+            const imgWidthPx = img.width, imgHeightPx = img.height;
+            const ratio = Math.min(PAGE_WIDTH_MM / imgWidthPx, PAGE_HEIGHT_MM / imgHeightPx);
+            const drawWidth = imgWidthPx * ratio, drawHeight = imgHeightPx * ratio;
+            const x = (PAGE_WIDTH_MM - drawWidth) / 2, y = (PAGE_HEIGHT_MM - drawHeight) / 2;
+            pdf.addImage(dataUrlCorregida, 'JPEG', x, y, drawWidth, drawHeight);
+            agregarMarcaAgua(pdf);
+        }
+        pdf.save(`scan_${Date.now()}.pdf`);
+        statusEl.innerHTML = `✅ PDF de ${total} páginas generado.`;
+        // Limpiar cola después de conversión exitosa
+        queue.length = 0;
+        renderizarCola(queue, previewContainerId);
+    }
+
+    // ==================== AUTENTICACIÓN Y PANTALLAS ====================
     function mostrarPantalla(tipo) {
         authFormsDiv.style.display = 'none';
         userInfoDiv.style.display = 'none';
@@ -677,7 +713,6 @@
     }
 
     async function cargarUsuariosAdmin() {
-        // ... (código existente, sin cambios)
         ['pendingUsersList','approvedUsersList','rejectedUsersList'].forEach(id => {
             document.getElementById(id).innerHTML = '<span class="spinner" style="border-color:#1e3c72;border-top-color:transparent;"></span> Cargando...';
         });
@@ -739,16 +774,15 @@
         if (user) await verificarUsuario(user);
         else mostrarPantalla('login');
     });
+
     document.getElementById('loginBtn').onclick = async () => {
-        const email = document.getElementById('email').value.trim();
-        const password = document.getElementById('password').value;
+        const email = document.getElementById('email').value.trim(), password = document.getElementById('password').value;
         if (!email || !password) { authMessage.innerText = "Correo y contraseña requeridos."; return; }
         try { await auth.signInWithEmailAndPassword(email, password); authMessage.innerText = ""; }
         catch(err) { authMessage.innerText = "Error: " + err.message; }
     };
     document.getElementById('registerBtn').onclick = async () => {
-        const email = document.getElementById('email').value.trim();
-        const password = document.getElementById('password').value;
+        const email = document.getElementById('email').value.trim(), password = document.getElementById('password').value;
         if (!email || !password) { authMessage.innerText = "Correo y contraseña requeridos."; return; }
         if (password.length < 6) { authMessage.innerText = "La contraseña debe tener al menos 6 caracteres."; return; }
         try { await auth.createUserWithEmailAndPassword(email, password); authMessage.innerText = "✅ Registro exitoso. Esperando aprobación."; }
@@ -764,65 +798,46 @@
     document.getElementById('refreshPendingBtn').onclick = async () => { if (currentUser) await verificarUsuario(currentUser); };
     document.getElementById('recargarUsuariosBtn').onclick = async () => { await cargarUsuariosAdmin(); };
 
-    // ============================================================
-    // HELPERS IMAGEN (usuario y admin)
-    // ============================================================
-    function cargarImagenDesdeFile(file, previewEl, statusEl) {
-        if (!file) return null;
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = () => {
-            previewEl.innerHTML = `<img src="${url}" style="max-width:100%;max-height:180px;border-radius:12px;"><br>✅ ${file.name}`;
-            statusEl.innerText = `Imagen cargada: ${file.name}`;
+    // ==================== INICIALIZACIÓN DE HERRAMIENTAS ====================
+    function initImageTools(prefix, queueRef, previewId, statusId) {
+        // inputs de archivo
+        document.getElementById(`cameraInput${prefix}`).addEventListener('change', e => {
+            if (e.target.files.length) {
+                agregarImagen(e.target.files[0], queueRef, previewId);
+                e.target.value = '';
+            }
+        });
+        document.getElementById(`galleryInput${prefix}`).addEventListener('change', e => {
+            if (e.target.files.length) {
+                agregarImagen(e.target.files[0], queueRef, previewId);
+                e.target.value = '';
+            }
+        });
+        // botón de vaciar lista (si existe)
+        const clearBtn = document.getElementById(`clearQueue${prefix}`);
+        if (clearBtn) clearBtn.onclick = () => {
+            queueRef.length = 0;
+            renderizarCola(queueRef, previewId);
         };
-        img.src = url;
-        return img;
+        // botón convertir
+        const convertBtnId = prefix === '' ? 'convertToPdfBtn' : 'convertBtnA';
+        document.getElementById(convertBtnId).addEventListener('click', () => {
+            convertirColaAPdf(queueRef, document.getElementById(statusId), previewId);
+        });
     }
 
     // Usuario normal
-    let imgU = null;
-    document.getElementById('cameraInput').addEventListener('change', e => {
-        if (e.target.files.length) imgU = cargarImagenDesdeFile(e.target.files[0], document.getElementById('imagePreviewArea'), document.getElementById('imgStatus'));
-    });
-    document.getElementById('galleryInput').addEventListener('change', e => {
-        if (e.target.files.length) imgU = cargarImagenDesdeFile(e.target.files[0], document.getElementById('imagePreviewArea'), document.getElementById('imgStatus'));
-    });
-    document.getElementById('convertToPdfBtn').addEventListener('click', () => {
-        if (!imgU) { alert("Selecciona una imagen."); return; }
-        abrirPerspYConvertir(imgU, document.getElementById('imgStatus'), document.getElementById('imagePreviewArea'));
-    });
+    initImageTools('', imageQueue, 'imagePreviewArea', 'imgStatus');
+    // Administrador
+    initImageTools('A', imageQueueA, 'previewA', 'statusImgA');
 
+    // Unir PDFs (usuario y admin)
     let mergeFiles = [];
     document.getElementById('unionPdfInput').addEventListener('change', e => {
         mergeFiles = Array.from(e.target.files);
         document.getElementById('mergeListArea').innerText = mergeFiles.length ? `✅ ${mergeFiles.length} PDFs seleccionados` : "Ninguno";
     });
     document.getElementById('mergeBtn').addEventListener('click', () => unirPdfs(mergeFiles, document.getElementById('mergeStatus')));
-
-    let splitBuf = null;
-    document.getElementById('splitPdfInput').addEventListener('change', async e => {
-        if (e.target.files[0]) { splitBuf = await e.target.files[0].arrayBuffer(); document.getElementById('splitStatus').innerText = `✅ ${e.target.files[0].name}`; }
-    });
-    document.getElementById('splitDoBtn').addEventListener('click', () => dividirPdf(splitBuf, parseInt(document.getElementById('pagInicio').value), parseInt(document.getElementById('pagFin').value), document.getElementById('splitStatus')));
-
-    let compBuf = null;
-    document.getElementById('compressPdfInput').addEventListener('change', async e => {
-        if (e.target.files[0]) { compBuf = await e.target.files[0].arrayBuffer(); document.getElementById('compressStatus').innerText = `📁 ${e.target.files[0].name}`; }
-    });
-    document.getElementById('compressBtn').addEventListener('click', () => comprimirPdf(compBuf, document.getElementById('compressStatus')));
-
-    // Admin herramientas
-    let imgA = null;
-    document.getElementById('cameraInputA').addEventListener('change', e => {
-        if (e.target.files.length) imgA = cargarImagenDesdeFile(e.target.files[0], document.getElementById('previewA'), document.getElementById('statusImgA'));
-    });
-    document.getElementById('galleryInputA').addEventListener('change', e => {
-        if (e.target.files.length) imgA = cargarImagenDesdeFile(e.target.files[0], document.getElementById('previewA'), document.getElementById('statusImgA'));
-    });
-    document.getElementById('convertBtnA').addEventListener('click', () => {
-        if (!imgA) { alert("Selecciona una imagen."); return; }
-        abrirPerspYConvertir(imgA, document.getElementById('statusImgA'), document.getElementById('previewA'));
-    });
 
     let mergeFilesA = [];
     document.getElementById('mergeInputA').addEventListener('change', e => {
@@ -831,11 +846,25 @@
     });
     document.getElementById('mergeBtnA').addEventListener('click', () => unirPdfs(mergeFilesA, document.getElementById('statusMergeA')));
 
+    // Dividir PDFs
+    let splitBuf = null;
+    document.getElementById('splitPdfInput').addEventListener('change', async e => {
+        if (e.target.files[0]) { splitBuf = await e.target.files[0].arrayBuffer(); document.getElementById('splitStatus').innerText = `✅ ${e.target.files[0].name}`; }
+    });
+    document.getElementById('splitDoBtn').addEventListener('click', () => dividirPdf(splitBuf, parseInt(document.getElementById('pagInicio').value), parseInt(document.getElementById('pagFin').value), document.getElementById('splitStatus')));
+
     let splitBufA = null;
     document.getElementById('splitInputA').addEventListener('change', async e => {
         if (e.target.files[0]) { splitBufA = await e.target.files[0].arrayBuffer(); document.getElementById('statusSplitA').innerText = `✅ ${e.target.files[0].name}`; }
     });
     document.getElementById('splitBtnA').addEventListener('click', () => dividirPdf(splitBufA, parseInt(document.getElementById('splitStartA').value), parseInt(document.getElementById('splitEndA').value), document.getElementById('statusSplitA')));
+
+    // Comprimir PDFs
+    let compBuf = null;
+    document.getElementById('compressPdfInput').addEventListener('change', async e => {
+        if (e.target.files[0]) { compBuf = await e.target.files[0].arrayBuffer(); document.getElementById('compressStatus').innerText = `📁 ${e.target.files[0].name}`; }
+    });
+    document.getElementById('compressBtn').addEventListener('click', () => comprimirPdf(compBuf, document.getElementById('compressStatus')));
 
     let compBufA = null;
     document.getElementById('compressInputA').addEventListener('change', async e => {
