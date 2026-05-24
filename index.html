@@ -59,21 +59,88 @@
         .queue-controls { display: flex; gap: 4px; }
         .queue-controls button { padding: 4px 8px; font-size: 0.7rem; }
 
-        /* MODAL CÁMARA INTERNA */
+        /* MODAL CÁMARA INTERNA MEJORADO */
         #cameraModal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 10000; flex-direction: column;
             align-items: center; justify-content: center;
         }
         #cameraModal.activo { display: flex; }
-        #cameraVideo {
-            max-width: 95vw; max-height: 70vh; border-radius: 12px;
-            background: #000; transform: scaleX(-1); /* espejo para vista previa natural */
+        .camera-header {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10001;
         }
-        .camera-btns { margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
-        #capturePhotoBtn { background: #dc2626; font-size: 1.2rem; padding: 12px 24px; }
-        .close-camera-btn { background: #4b5563; }
-        .camera-loading { color: white; text-align: center; margin-bottom: 10px; }
+        .camera-header button {
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-size: 1rem;
+            backdrop-filter: blur(4px);
+        }
+        .video-container {
+            position: relative;
+            max-width: 95vw;
+            max-height: 70vh;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        #cameraVideo {
+            width: 100%;
+            height: auto;
+            display: block;
+            transform: scaleX(-1);
+            background: #000;
+        }
+        #cameraOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .capture-btn-container {
+            margin-top: 25px;
+            text-align: center;
+        }
+        .capture-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background-color: #4caf50;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.1s ease, background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .capture-btn:active {
+            transform: scale(0.92);
+            background-color: #388e3c;
+        }
+        .capture-btn::before {
+            content: "📸";
+            font-size: 2.5rem;
+        }
+        .camera-loading {
+            color: white;
+            text-align: center;
+            margin-bottom: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 16px;
+            border-radius: 40px;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10001;
+        }
     </style>
 </head>
 <body>
@@ -249,13 +316,18 @@
     </div>
 </div>
 
-<!-- MODAL CÁMARA INTERNA -->
+<!-- MODAL CÁMARA INTERNA MEJORADO -->
 <div id="cameraModal">
+    <div class="camera-header">
+        <button id="closeCameraBtn">Listo</button>
+    </div>
     <div class="camera-loading" id="cameraLoading">📷 Iniciando cámara...</div>
-    <video id="cameraVideo" autoplay playsinline muted></video>
-    <div class="camera-btns">
-        <button id="capturePhotoBtn">📸 Tomar foto</button>
-        <button id="closeCameraBtn" class="close-camera-btn">❌ Cancelar</button>
+    <div class="video-container">
+        <video id="cameraVideo" autoplay playsinline muted></video>
+        <canvas id="cameraOverlay"></canvas>
+    </div>
+    <div class="capture-btn-container">
+        <button id="capturePhotoBtn" class="capture-btn" aria-label="Tomar foto"></button>
     </div>
 </div>
 
@@ -263,17 +335,16 @@
     // ==================== CONFIGURACIÓN ====================
     const PAGE_WIDTH_MM = 211.6;
     const PAGE_HEIGHT_MM = 320.1;
-    const ADMIN_EMAIL = "waroiapy@gmail.com"; // solo referencia visual, la seguridad se basa en campo 'rol' en Firestore
+    const ADMIN_EMAIL = "waroiapy@gmail.com";
 
-    // Colas de imágenes (sin límite de cantidad)
-    let imageQueue = [];      // usuario normal
-    let imageQueueA = [];     // admin
+    let imageQueue = [];
+    let imageQueueA = [];
 
-    // Variables para la cámara interna
     let currentStream = null;
-    let currentQueueTarget = null; // referencia a la cola (imageQueue o imageQueueA)
+    let currentQueueTarget = null;
     let currentPreviewContainerId = null;
     let currentStatusId = null;
+    let animationFrameId = null; // para dibujar el marco
 
     // Firebase
     const firebaseConfig = {
@@ -289,7 +360,6 @@
     const db = firebase.firestore();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Referencias DOM
     const authFormsDiv = document.getElementById('authForms');
     const userInfoDiv = document.getElementById('userInfo');
     const appFunctionsDiv = document.getElementById('appFunctions');
@@ -482,7 +552,7 @@
         cerrarPerspectiva(null, true);
     };
 
-    // ==================== FUNCIONES PDF COMUNES ====================
+    // ==================== FUNCIONES PDF ====================
     function agregarMarcaAgua(pdf) {
         const total = pdf.internal.getNumberOfPages();
         for (let i = 1; i <= total; i++) {
@@ -582,7 +652,7 @@
         } catch(err) { statusEl.innerText = "Error: " + err.message; console.error(err); }
     }
 
-    // ==================== GESTIÓN DE COLA DE IMÁGENES (SIN LÍMITE) ====================
+    // ==================== COLA DE IMÁGENES ====================
     function agregarImagen(file, queue, previewContainerId) {
         if (!file.type.startsWith('image/')) {
             alert('Solo se permiten imágenes');
@@ -691,7 +761,7 @@
         renderizarCola(queue, previewContainerId);
     }
 
-    // ==================== CÁMARA INTERNA (sin salir de la app) ====================
+    // ==================== CÁMARA INTERNA CON MARCO Y BOTÓN VERDE ====================
     async function iniciarCamara(queue, previewContainerId, statusId) {
         currentQueueTarget = queue;
         currentPreviewContainerId = previewContainerId;
@@ -710,6 +780,52 @@
             video.srcObject = stream;
             await video.play();
             loadingDiv.style.display = 'none';
+            // Iniciar el dibujo del marco
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            function drawFrame() {
+                if (!video.videoWidth || video.videoWidth === 0) {
+                    animationFrameId = requestAnimationFrame(drawFrame);
+                    return;
+                }
+                const overlay = document.getElementById('cameraOverlay');
+                const container = document.querySelector('.video-container');
+                const rect = container.getBoundingClientRect();
+                overlay.width = rect.width;
+                overlay.height = rect.height;
+                const ctxOverlay = overlay.getContext('2d');
+                ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
+                // Dibujar marco tipo hoja (proporción 1/√2 o similar)
+                const marginX = overlay.width * 0.1;
+                const marginY = overlay.height * 0.15;
+                const frameW = overlay.width - marginX * 2;
+                const frameH = overlay.height - marginY * 2;
+                ctxOverlay.strokeStyle = '#fff';
+                ctxOverlay.lineWidth = 3;
+                ctxOverlay.setLineDash([10, 15]);
+                ctxOverlay.strokeRect(marginX, marginY, frameW, frameH);
+                ctxOverlay.setLineDash([]);
+                ctxOverlay.strokeStyle = '#4caf50';
+                ctxOverlay.lineWidth = 2;
+                ctxOverlay.strokeRect(marginX, marginY, frameW, frameH);
+                // Esquinas
+                const cornerLen = 20;
+                ctxOverlay.beginPath();
+                ctxOverlay.moveTo(marginX, marginY + cornerLen);
+                ctxOverlay.lineTo(marginX, marginY);
+                ctxOverlay.lineTo(marginX + cornerLen, marginY);
+                ctxOverlay.moveTo(marginX + frameW - cornerLen, marginY);
+                ctxOverlay.lineTo(marginX + frameW, marginY);
+                ctxOverlay.lineTo(marginX + frameW, marginY + cornerLen);
+                ctxOverlay.moveTo(marginX + frameW, marginY + frameH - cornerLen);
+                ctxOverlay.lineTo(marginX + frameW, marginY + frameH);
+                ctxOverlay.lineTo(marginX + frameW - cornerLen, marginY + frameH);
+                ctxOverlay.moveTo(marginX + cornerLen, marginY + frameH);
+                ctxOverlay.lineTo(marginX, marginY + frameH);
+                ctxOverlay.lineTo(marginX, marginY + frameH - cornerLen);
+                ctxOverlay.stroke();
+                animationFrameId = requestAnimationFrame(drawFrame);
+            }
+            drawFrame();
         } catch (err) {
             loadingDiv.innerText = '❌ Error al acceder a la cámara: ' + err.message;
             console.error(err);
@@ -744,9 +860,16 @@
         const video = document.getElementById('cameraVideo');
         video.srcObject = null;
         currentQueueTarget = null;
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        const overlay = document.getElementById('cameraOverlay');
+        const ctxOverlay = overlay.getContext('2d');
+        ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
     }
 
-    // ==================== AUTENTICACIÓN Y PANTALLAS ====================
+    // ==================== AUTENTICACIÓN ====================
     function mostrarPantalla(tipo) {
         authFormsDiv.style.display = 'none';
         userInfoDiv.style.display = 'none';
@@ -780,12 +903,10 @@
         try {
             const docRef = db.collection('users').doc(user.uid);
             const doc = await docRef.get();
-            // Verificar si el usuario tiene rol de administrador (seguridad real)
             let esAdmin = false;
             if (doc.exists && doc.data().rol === 'admin') {
                 esAdmin = true;
             } else if (user.email === ADMIN_EMAIL && !doc.exists) {
-                // Solo la primera vez que se registra el admin, se le asigna rol admin
                 await docRef.set({
                     email: user.email,
                     fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
@@ -838,7 +959,7 @@
             const pendientes = [], aprobados = [], rechazados = [];
             snapshot.forEach(doc => {
                 const d = { ...doc.data(), id: doc.id };
-                if (d.rol === 'admin') return; // ocultar admin de las listas
+                if (d.rol === 'admin') return;
                 const estado = (d.estado || 'pendiente').toLowerCase();
                 if (estado === 'pendiente') pendientes.push(d);
                 else if (estado === 'aprobado') aprobados.push(d);
@@ -916,14 +1037,12 @@
     document.getElementById('refreshPendingBtn').onclick = async () => { if (currentUser) await verificarUsuario(currentUser); };
     document.getElementById('recargarUsuariosBtn').onclick = async () => { await cargarUsuariosAdmin(); };
 
-    // ==================== INICIALIZACIÓN DE HERRAMIENTAS ====================
+    // ==================== INICIALIZACIÓN ====================
     function initImageTools(prefix, queueRef, previewId, statusId) {
-        // Botón de cámara interna
         const cameraBtn = document.getElementById(`cameraBtn${prefix}`);
         if (cameraBtn) {
             cameraBtn.onclick = () => iniciarCamara(queueRef, previewId, statusId);
         }
-        // Galería
         const galleryInput = document.getElementById(`galleryInput${prefix}`);
         if (galleryInput) {
             galleryInput.addEventListener('change', e => {
@@ -933,7 +1052,6 @@
                 }
             });
         }
-        // Vaciar lista
         const clearBtn = document.getElementById(`clearQueue${prefix}`);
         if (clearBtn) {
             clearBtn.onclick = () => {
@@ -942,19 +1060,15 @@
                 renderizarCola(queueRef, previewId);
             };
         }
-        // Convertir
         const convertBtnId = prefix === '' ? 'convertToPdfBtn' : 'convertBtnA';
         document.getElementById(convertBtnId).addEventListener('click', () => {
             convertirColaAPdf(queueRef, document.getElementById(statusId), previewId);
         });
     }
 
-    // Usuario normal
     initImageTools('', imageQueue, 'imagePreviewArea', 'imgStatus');
-    // Administrador
     initImageTools('A', imageQueueA, 'previewA', 'statusImgA');
 
-    // Unir PDFs (usuario y admin)
     let mergeFiles = [];
     document.getElementById('unionPdfInput').addEventListener('change', e => {
         mergeFiles = Array.from(e.target.files);
@@ -969,7 +1083,6 @@
     });
     document.getElementById('mergeBtnA').addEventListener('click', () => unirPdfs(mergeFilesA, document.getElementById('statusMergeA')));
 
-    // Dividir PDFs
     let splitBuf = null;
     document.getElementById('splitPdfInput').addEventListener('change', async e => {
         if (e.target.files[0]) { splitBuf = await e.target.files[0].arrayBuffer(); document.getElementById('splitStatus').innerText = `✅ ${e.target.files[0].name}`; }
@@ -982,7 +1095,6 @@
     });
     document.getElementById('splitBtnA').addEventListener('click', () => dividirPdf(splitBufA, parseInt(document.getElementById('splitStartA').value), parseInt(document.getElementById('splitEndA').value), document.getElementById('statusSplitA')));
 
-    // Comprimir PDFs
     let compBuf = null;
     document.getElementById('compressPdfInput').addEventListener('change', async e => {
         if (e.target.files[0]) { compBuf = await e.target.files[0].arrayBuffer(); document.getElementById('compressStatus').innerText = `📁 ${e.target.files[0].name}`; }
@@ -995,34 +1107,19 @@
     });
     document.getElementById('compressBtnA').addEventListener('click', () => comprimirPdf(compBufA, document.getElementById('statusCompressA')));
 
-    // Cerrar modal de cámara
     document.getElementById('closeCameraBtn').addEventListener('click', cerrarCamara);
     document.getElementById('capturePhotoBtn').addEventListener('click', capturarFoto);
 
-    // Helper para escapar HTML
     function escapeHtml(str) {
         return str.replace(/[&<>]/g, function(m) {
             if (m === '&') return '&amp;';
             if (m === '<') return '&lt;';
             if (m === '>') return '&gt;';
             return m;
-        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-            return c;
         });
     }
 
-    // Mostrar advertencia sobre reglas de Firestore (en consola)
-    console.log("✅ App cargada. Recuerda configurar las reglas de Firestore para mayor seguridad:\n" +
-        "rules_version = '2';\n" +
-        "service cloud.firestore {\n" +
-        "  match /databases/{database}/documents {\n" +
-        "    match /users/{userId} {\n" +
-        "      allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'admin');\n" +
-        "      allow write: if request.auth != null && request.auth.uid == userId;\n" +
-        "      allow update: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'admin');\n" +
-        "    }\n" +
-        "  }\n" +
-        "}");
+    console.log("✅ App cargada. Recuerda configurar reglas de Firestore para seguridad.");
 </script>
 </body>
 </html>
