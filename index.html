@@ -129,11 +129,18 @@
                         <input type="file" id="cameraInputA" accept="image/*" capture="environment" style="display:none;">
                     </label>
                     <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
-                        <input type="file" id="galleryInputA" accept="image/*" style="display:none;">
+                        <input type="file" id="galleryInputA" accept="image/*" multiple style="display:none;">
                     </label>
                 </div>
-                <button id="convertBtnA">📑 Convertir a PDF</button>
-                <div class="preview-area" id="previewA">🖼️ Vista previa</div>
+                <div id="photoCountBadgeA" style="display:none; background:#e0f2fe; border-radius:12px; padding:8px 12px; margin:8px 0; font-size:0.88rem; color:#0369a1; font-weight:bold;">
+                    📷 <span id="photoCountA">0</span> foto(s) en cola
+                    <button id="clearPhotosBtnA" style="background:#dc2626; padding:4px 10px; font-size:0.78rem; margin-left:8px; border-radius:20px;">🗑️ Limpiar</button>
+                </div>
+                <div class="preview-area" id="previewA" style="display:flex; flex-wrap:wrap; gap:8px; min-height:50px;">🖼️ Las fotos capturadas aparecerán aquí</div>
+                <div class="btn-group" style="margin-top:10px;">
+                    <button id="convertBtnA" style="background:#2c7a4d;">📑 Foto a PDF (1 página)</button>
+                    <button id="convertAllBtnA" style="background:#1e3c72; display:none;">📚 Unir todas → 1 PDF</button>
+                </div>
                 <div class="status" id="statusImgA"></div>
             </div>
 
@@ -180,11 +187,19 @@
                     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
                 </label>
                 <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
-                    <input type="file" id="galleryInput" accept="image/*" style="display:none;">
+                    <input type="file" id="galleryInput" accept="image/*" multiple style="display:none;">
                 </label>
             </div>
-            <button id="convertToPdfBtn">📑 Convertir imagen a PDF</button>
-            <div class="preview-area" id="imagePreviewArea">🖼️ Vista previa</div>
+            <!-- Contador y lista de fotos capturadas -->
+            <div id="photoCountBadge" style="display:none; background:#e0f2fe; border-radius:12px; padding:8px 12px; margin:8px 0; font-size:0.88rem; color:#0369a1; font-weight:bold;">
+                📷 <span id="photoCount">0</span> foto(s) en cola
+                <button id="clearPhotosBtn" style="background:#dc2626; padding:4px 10px; font-size:0.78rem; margin-left:8px; border-radius:20px;">🗑️ Limpiar</button>
+            </div>
+            <div class="preview-area" id="imagePreviewArea" style="display:flex; flex-wrap:wrap; gap:8px; min-height:50px;">🖼️ Las fotos capturadas aparecerán aquí</div>
+            <div class="btn-group" style="margin-top:10px;">
+                <button id="convertToPdfBtn" style="background:#2c7a4d;">📑 Foto a PDF (1 página)</button>
+                <button id="convertAllToPdfBtn" style="background:#1e3c72; display:none;">📚 Unir todas → 1 PDF</button>
+            </div>
             <div class="status" id="imgStatus"></div>
         </div>
         <div class="card">
@@ -515,16 +530,37 @@
     // ============================================================
     // FUNCIONES PDF
     // ============================================================
+
+    // Tamaño Folio: 21.16 x 33.01 cm
+    const FOLIO_W = 211.6; // mm
+    const FOLIO_H = 330.1; // mm
+
+    // Calcula dimensiones auto-ajustadas manteniendo proporción dentro del folio
+    function fitImageEnFolio(imgW, imgH, landscape) {
+        const pageW = landscape ? FOLIO_H : FOLIO_W;
+        const pageH = landscape ? FOLIO_W : FOLIO_H;
+        const ratio = Math.min(pageW / imgW, pageH / imgH);
+        const w = imgW * ratio;
+        const h = imgH * ratio;
+        const x = (pageW - w) / 2;
+        const y = (pageH - h) / 2;
+        return { pageW, pageH, w, h, x, y };
+    }
+
     function convertirDataUrlAPdf(dataUrl, statusEl) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
                 try {
                     const { jsPDF } = window.jspdf;
-                    const pdf = new jsPDF({ orientation: img.width > img.height ? 'landscape' : 'portrait', unit: 'mm' });
-                    const w = pdf.internal.pageSize.getWidth();
-                    const h = (img.height * w) / img.width;
-                    pdf.addImage(dataUrl, 'JPEG', 0, 0, w, h, undefined, 'FAST');
+                    const landscape = img.width > img.height;
+                    const fit = fitImageEnFolio(img.width, img.height, landscape);
+                    const pdf = new jsPDF({
+                        orientation: landscape ? 'landscape' : 'portrait',
+                        unit: 'mm',
+                        format: [FOLIO_W, FOLIO_H]
+                    });
+                    pdf.addImage(dataUrl, 'JPEG', fit.x, fit.y, fit.w, fit.h, undefined, 'FAST');
                     agregarMarcaAgua(pdf);
                     pdf.save(`scan_${Date.now()}.pdf`);
                     statusEl.innerText = "✅ PDF descargado.";
@@ -533,6 +569,43 @@
             };
             img.onerror = reject;
             img.src = dataUrl;
+        });
+    }
+
+    // Convierte un array de dataUrls a un PDF multi-página folio
+    function convertirVariasImagenesAPdf(dataUrls, statusEl) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const { jsPDF } = window.jspdf;
+                let pdf = null;
+                for (let i = 0; i < dataUrls.length; i++) {
+                    await new Promise((res, rej) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const landscape = img.width > img.height;
+                            const fit = fitImageEnFolio(img.width, img.height, landscape);
+                            if (!pdf) {
+                                pdf = new jsPDF({
+                                    orientation: landscape ? 'landscape' : 'portrait',
+                                    unit: 'mm',
+                                    format: [FOLIO_W, FOLIO_H]
+                                });
+                            } else {
+                                pdf.addPage([FOLIO_W, FOLIO_H], landscape ? 'landscape' : 'portrait');
+                            }
+                            pdf.addImage(dataUrls[i], 'JPEG', fit.x, fit.y, fit.w, fit.h, undefined, 'FAST');
+                            res();
+                        };
+                        img.onerror = rej;
+                        img.src = dataUrls[i];
+                    });
+                    statusEl.innerHTML = `<span class="spinner"></span> Procesando foto ${i+1} de ${dataUrls.length}...`;
+                }
+                agregarMarcaAgua(pdf);
+                pdf.save(`scan_multi_${Date.now()}.pdf`);
+                statusEl.innerText = `✅ PDF con ${dataUrls.length} página(s) descargado.`;
+                resolve();
+            } catch(err) { reject(err); }
         });
     }
 
@@ -615,7 +688,7 @@
         try {
             const pdf = await pdfjsLib.getDocument({ data: buffer.slice(0) }).promise;
             const { jsPDF } = window.jspdf;
-            const newPdf = new jsPDF();
+            const newPdf = new jsPDF({ unit: 'mm', format: [FOLIO_W, FOLIO_H] });
             for (let i = 1; i <= pdf.numPages; i++) {
                 statusEl.innerHTML = `<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`;
                 const page = await pdf.getPage(i);
@@ -624,10 +697,10 @@
                 canvas.width = viewport.width; canvas.height = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 const imgData = canvas.toDataURL('image/jpeg', 0.3);
-                const w = newPdf.internal.pageSize.getWidth();
-                const h = (viewport.height * w) / viewport.width;
-                if (i > 1) newPdf.addPage();
-                newPdf.addImage(imgData, 'JPEG', 0, 0, w, h);
+                const landscape = viewport.width > viewport.height;
+                const fit = fitImageEnFolio(viewport.width, viewport.height, landscape);
+                if (i > 1) newPdf.addPage([FOLIO_W, FOLIO_H], landscape ? 'landscape' : 'portrait');
+                newPdf.addImage(imgData, 'JPEG', fit.x, fit.y, fit.w, fit.h);
             }
             agregarMarcaAgua(newPdf);
             const origKB = buffer.byteLength / 1024;
@@ -807,34 +880,113 @@
     document.getElementById('recargarUsuariosBtn').onclick = async () => { await cargarUsuariosAdmin(); };
 
     // ============================================================
-    // HELPERS DE SELECCIÓN DE IMAGEN
+    // HELPERS DE SELECCIÓN DE IMAGEN (multi-foto)
     // ============================================================
-    function cargarImagenDesdeFile(file, previewEl, statusEl, convertBtn) {
-        if (!file) return null;
+
+    // Agrega una imagen al array de fotos en cola y actualiza la preview
+    function agregarFotoACola(file, colaDataUrls, previewEl, countBadge, countSpan, convertAllBtn) {
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
-            previewEl.innerHTML = `<img src="${url}" style="max-width:100%;max-height:180px;border-radius:12px;"><br>✅ ${file.name}`;
-            statusEl.innerText = `Imagen cargada: ${file.name}`;
+            colaDataUrls.push(img.src);
+            // Miniatura en preview
+            const thumb = document.createElement('div');
+            thumb.style.cssText = 'position:relative;display:inline-block;';
+            const imgEl = document.createElement('img');
+            imgEl.src = url;
+            imgEl.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid #2c7a4d;';
+            const num = document.createElement('span');
+            num.innerText = colaDataUrls.length;
+            num.style.cssText = 'position:absolute;top:2px;left:4px;background:#1e3c72;color:white;font-size:0.7rem;font-weight:bold;border-radius:10px;padding:1px 5px;';
+            thumb.appendChild(imgEl);
+            thumb.appendChild(num);
+            if (previewEl.childNodes.length === 1 && previewEl.childNodes[0].nodeType === 3) previewEl.innerHTML = '';
+            previewEl.appendChild(thumb);
+            countSpan.innerText = colaDataUrls.length;
+            countBadge.style.display = 'block';
+            if (colaDataUrls.length > 1) convertAllBtn.style.display = 'inline-block';
         };
         img.src = url;
-        return img;
+    }
+
+    function limpiarCola(colaDataUrls, previewEl, countBadge, convertAllBtn, defaultText) {
+        colaDataUrls.length = 0;
+        previewEl.innerHTML = defaultText;
+        countBadge.style.display = 'none';
+        convertAllBtn.style.display = 'none';
     }
 
     // ============================================================
     // USUARIO NORMAL
     // ============================================================
     let imgU = null;
-    document.getElementById('cameraInput').addEventListener('change', e => {
-        if (e.target.files.length) imgU = cargarImagenDesdeFile(e.target.files[0], document.getElementById('imagePreviewArea'), document.getElementById('imgStatus'));
-    });
-    document.getElementById('galleryInput').addEventListener('change', e => {
-        if (e.target.files.length) imgU = cargarImagenDesdeFile(e.target.files[0], document.getElementById('imagePreviewArea'), document.getElementById('imgStatus'));
-    });
-    document.getElementById('convertToPdfBtn').addEventListener('click', () => {
-        if (!imgU) { alert("Selecciona una imagen."); return; }
-        abrirPerspYConvertir(imgU, document.getElementById('imgStatus'), document.getElementById('imagePreviewArea'));
-    });
+    let colaU = []; // dataUrls de fotos en cola
+
+    function setupCamaraUsuario() {
+        const previewEl = document.getElementById('imagePreviewArea');
+        const countBadge = document.getElementById('photoCountBadge');
+        const countSpan = document.getElementById('photoCount');
+        const convertAllBtn = document.getElementById('convertAllToPdfBtn');
+        const statusEl = document.getElementById('imgStatus');
+
+        document.getElementById('cameraInput').addEventListener('change', e => {
+            if (!e.target.files.length) return;
+            const file = e.target.files[0];
+            // Cargar como imagen para persp + cola
+            const url = URL.createObjectURL(file);
+            imgU = new Image();
+            imgU.onload = () => {
+                agregarFotoACola(file, colaU, previewEl, countBadge, countSpan, convertAllBtn);
+                statusEl.innerText = `📷 Foto ${colaU.length} añadida. Puedes sacar otra.`;
+            };
+            imgU.src = url;
+            // Reset input para poder volver a disparar con la misma cámara
+            e.target.value = '';
+        });
+
+        document.getElementById('galleryInput').addEventListener('change', e => {
+            if (!e.target.files.length) return;
+            Array.from(e.target.files).forEach(file => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    imgU = img;
+                    agregarFotoACola(file, colaU, previewEl, countBadge, countSpan, convertAllBtn);
+                };
+                img.src = url;
+            });
+            statusEl.innerText = `🖼️ ${e.target.files.length} imagen(es) añadida(s).`;
+            e.target.value = '';
+        });
+
+        document.getElementById('convertToPdfBtn').addEventListener('click', () => {
+            if (!imgU && colaU.length === 0) { alert("Captura al menos una foto."); return; }
+            if (colaU.length > 0) {
+                // Convertir última foto (última en la cola)
+                const lastDataUrl = colaU[colaU.length - 1];
+                const tmpImg = new Image();
+                tmpImg.onload = () => abrirPerspYConvertir(tmpImg, statusEl, previewEl);
+                tmpImg.src = lastDataUrl;
+            } else {
+                abrirPerspYConvertir(imgU, statusEl, previewEl);
+            }
+        });
+
+        document.getElementById('convertAllToPdfBtn').addEventListener('click', async () => {
+            if (colaU.length < 2) { alert("Necesitas al menos 2 fotos para unir."); return; }
+            statusEl.innerHTML = '<span class="spinner"></span> Generando PDF multi-página...';
+            try {
+                await convertirVariasImagenesAPdf(colaU, statusEl);
+            } catch(err) { statusEl.innerText = "Error: " + err.message; }
+        });
+
+        document.getElementById('clearPhotosBtn').addEventListener('click', () => {
+            limpiarCola(colaU, previewEl, countBadge, convertAllBtn, '🖼️ Las fotos capturadas aparecerán aquí');
+            imgU = null;
+            statusEl.innerText = '';
+        });
+    }
+    setupCamaraUsuario();
 
     let mergeFiles = [];
     document.getElementById('unionPdfInput').addEventListener('change', e => {
@@ -859,16 +1011,70 @@
     // ADMIN HERRAMIENTAS
     // ============================================================
     let imgA = null;
-    document.getElementById('cameraInputA').addEventListener('change', e => {
-        if (e.target.files.length) imgA = cargarImagenDesdeFile(e.target.files[0], document.getElementById('previewA'), document.getElementById('statusImgA'));
-    });
-    document.getElementById('galleryInputA').addEventListener('change', e => {
-        if (e.target.files.length) imgA = cargarImagenDesdeFile(e.target.files[0], document.getElementById('previewA'), document.getElementById('statusImgA'));
-    });
-    document.getElementById('convertBtnA').addEventListener('click', () => {
-        if (!imgA) { alert("Selecciona una imagen."); return; }
-        abrirPerspYConvertir(imgA, document.getElementById('statusImgA'), document.getElementById('previewA'));
-    });
+    let colaA = [];
+
+    function setupCamaraAdmin() {
+        const previewEl = document.getElementById('previewA');
+        const countBadge = document.getElementById('photoCountBadgeA');
+        const countSpan = document.getElementById('photoCountA');
+        const convertAllBtn = document.getElementById('convertAllBtnA');
+        const statusEl = document.getElementById('statusImgA');
+
+        document.getElementById('cameraInputA').addEventListener('change', e => {
+            if (!e.target.files.length) return;
+            const file = e.target.files[0];
+            const url = URL.createObjectURL(file);
+            imgA = new Image();
+            imgA.onload = () => {
+                agregarFotoACola(file, colaA, previewEl, countBadge, countSpan, convertAllBtn);
+                statusEl.innerText = `📷 Foto ${colaA.length} añadida. Puedes sacar otra.`;
+            };
+            imgA.src = url;
+            e.target.value = '';
+        });
+
+        document.getElementById('galleryInputA').addEventListener('change', e => {
+            if (!e.target.files.length) return;
+            Array.from(e.target.files).forEach(file => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    imgA = img;
+                    agregarFotoACola(file, colaA, previewEl, countBadge, countSpan, convertAllBtn);
+                };
+                img.src = url;
+            });
+            statusEl.innerText = `🖼️ ${e.target.files.length} imagen(es) añadida(s).`;
+            e.target.value = '';
+        });
+
+        document.getElementById('convertBtnA').addEventListener('click', () => {
+            if (!imgA && colaA.length === 0) { alert("Captura al menos una foto."); return; }
+            if (colaA.length > 0) {
+                const lastDataUrl = colaA[colaA.length - 1];
+                const tmpImg = new Image();
+                tmpImg.onload = () => abrirPerspYConvertir(tmpImg, statusEl, previewEl);
+                tmpImg.src = lastDataUrl;
+            } else {
+                abrirPerspYConvertir(imgA, statusEl, previewEl);
+            }
+        });
+
+        document.getElementById('convertAllBtnA').addEventListener('click', async () => {
+            if (colaA.length < 2) { alert("Necesitas al menos 2 fotos para unir."); return; }
+            statusEl.innerHTML = '<span class="spinner"></span> Generando PDF multi-página...';
+            try {
+                await convertirVariasImagenesAPdf(colaA, statusEl);
+            } catch(err) { statusEl.innerText = "Error: " + err.message; }
+        });
+
+        document.getElementById('clearPhotosBtnA').addEventListener('click', () => {
+            limpiarCola(colaA, previewEl, countBadge, convertAllBtn, '🖼️ Las fotos capturadas aparecerán aquí');
+            imgA = null;
+            statusEl.innerText = '';
+        });
+    }
+    setupCamaraAdmin();
 
     let mergeFilesA = [];
     document.getElementById('mergeInputA').addEventListener('change', e => {
