@@ -58,6 +58,22 @@
         .queue-item { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
         .queue-controls { display: flex; gap: 4px; }
         .queue-controls button { padding: 4px 8px; font-size: 0.7rem; }
+
+        /* MODAL CÁMARA INTERNA */
+        #cameraModal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 10000; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        #cameraModal.activo { display: flex; }
+        #cameraVideo {
+            max-width: 95vw; max-height: 70vh; border-radius: 12px;
+            background: #000; transform: scaleX(-1); /* espejo para vista previa natural */
+        }
+        .camera-btns { margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+        #capturePhotoBtn { background: #dc2626; font-size: 1.2rem; padding: 12px 24px; }
+        .close-camera-btn { background: #4b5563; }
+        .camera-loading { color: white; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -122,16 +138,14 @@
             <div id="rejectedUsersList">Cargando...</div>
         </div>
 
-        <!-- HERRAMIENTAS PDF DEL ADMIN (ahora con sistema de cola de imágenes) -->
+        <!-- HERRAMIENTAS PDF DEL ADMIN -->
         <div class="card" style="border:2px solid #1e3c72;">
             <h2 style="color:#1e3c72;">🛠️ Mis herramientas PDF</h2>
 
             <div class="tool-section">
                 <div style="font-weight:bold;">📸 Foto / Imagen a PDF (múltiples capturas)</div>
                 <div class="btn-group">
-                    <label class="file-input-label" style="background:#2c7a4d;">📷 Cámara
-                        <input type="file" id="cameraInputA" accept="image/*" capture="environment" style="display:none;">
-                    </label>
+                    <button id="cameraBtnA" class="file-input-label" style="background:#2c7a4d;">📷 Cámara</button>
                     <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
                         <input type="file" id="galleryInputA" accept="image/*" style="display:none;">
                     </label>
@@ -181,9 +195,7 @@
         <div class="card">
             <div style="font-weight:bold;">📸 Foto / Imagen a PDF (múltiples capturas)</div>
             <div class="btn-group">
-                <label class="file-input-label" style="background:#2c7a4d;">📷 Cámara
-                    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
-                </label>
+                <button id="cameraBtn" class="file-input-label" style="background:#2c7a4d;">📷 Cámara</button>
                 <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
                     <input type="file" id="galleryInput" accept="image/*" style="display:none;">
                 </label>
@@ -237,15 +249,31 @@
     </div>
 </div>
 
+<!-- MODAL CÁMARA INTERNA -->
+<div id="cameraModal">
+    <div class="camera-loading" id="cameraLoading">📷 Iniciando cámara...</div>
+    <video id="cameraVideo" autoplay playsinline muted></video>
+    <div class="camera-btns">
+        <button id="capturePhotoBtn">📸 Tomar foto</button>
+        <button id="closeCameraBtn" class="close-camera-btn">❌ Cancelar</button>
+    </div>
+</div>
+
 <script>
     // ==================== CONFIGURACIÓN ====================
     const PAGE_WIDTH_MM = 211.6;
     const PAGE_HEIGHT_MM = 320.1;
-    const ADMIN_EMAIL = "waroiapy@gmail.com";
+    const ADMIN_EMAIL = "waroiapy@gmail.com"; // solo referencia visual, la seguridad se basa en campo 'rol' en Firestore
 
-    // Colas de imágenes (separadas para usuario normal y admin)
+    // Colas de imágenes (sin límite de cantidad)
     let imageQueue = [];      // usuario normal
     let imageQueueA = [];     // admin
+
+    // Variables para la cámara interna
+    let currentStream = null;
+    let currentQueueTarget = null; // referencia a la cola (imageQueue o imageQueueA)
+    let currentPreviewContainerId = null;
+    let currentStatusId = null;
 
     // Firebase
     const firebaseConfig = {
@@ -261,7 +289,7 @@
     const db = firebase.firestore();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Referencias DOM frecuentes
+    // Referencias DOM
     const authFormsDiv = document.getElementById('authForms');
     const userInfoDiv = document.getElementById('userInfo');
     const appFunctionsDiv = document.getElementById('appFunctions');
@@ -271,7 +299,6 @@
     const authMessage = document.getElementById('authMessage');
     const adminBadgeContainer = document.getElementById('adminBadgeContainer');
 
-    // Variables de autenticación
     let currentUser = null, isAdmin = false, userData = null;
 
     // ==================== CORRECCIÓN DE PERSPECTIVA ====================
@@ -279,7 +306,7 @@
     const perspCanvas = document.getElementById('perspCanvas');
     const ctx = perspCanvas.getContext('2d');
     let perspImage = null, perspScale = 1, perspPoints = [];
-    let draggingIdx = -1, perspResolve = null;  // promesa para el resultado
+    let draggingIdx = -1, perspResolve = null;
 
     function abrirPerspectiva(imgElement) {
         return new Promise((resolve) => {
@@ -377,7 +404,7 @@
     perspCanvas.addEventListener('touchend', () => { draggingIdx = -1; });
 
     function distancia(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
-    function calcularHomografia(src, dst) { /* ... igual que antes ... */
+    function calcularHomografia(src, dst) {
         const A = [];
         for (let i = 0; i < 4; i++) {
             const sx = src[i].x, sy = src[i].y, dx = dst[i].x, dy = dst[i].y;
@@ -446,7 +473,6 @@
         cerrarPerspectiva(corregida);
     };
     document.getElementById('perspSkipBtn').onclick = () => {
-        // devolver la imagen original sin modificar
         const canvas = document.createElement('canvas');
         canvas.width = perspImage.naturalWidth; canvas.height = perspImage.naturalHeight;
         canvas.getContext('2d').drawImage(perspImage, 0, 0);
@@ -474,6 +500,7 @@
             const { PDFDocument } = PDFLib;
             const merged = await PDFDocument.create();
             for (const file of files) {
+                if (file.size > 20 * 1024 * 1024) { alert(`El archivo ${file.name} supera 20MB`); return; }
                 const buf = await file.arrayBuffer();
                 const pdf = await PDFDocument.load(buf);
                 const pages = await merged.copyPages(pdf, pdf.getPageIndices());
@@ -555,8 +582,16 @@
         } catch(err) { statusEl.innerText = "Error: " + err.message; console.error(err); }
     }
 
-    // ==================== GESTIÓN DE COLA DE IMÁGENES ====================
+    // ==================== GESTIÓN DE COLA DE IMÁGENES (SIN LÍMITE) ====================
     function agregarImagen(file, queue, previewContainerId) {
+        if (!file.type.startsWith('image/')) {
+            alert('Solo se permiten imágenes');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert('La imagen no puede superar los 10 MB');
+            return;
+        }
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
@@ -564,6 +599,14 @@
             renderizarCola(queue, previewContainerId);
         };
         img.src = url;
+    }
+
+    function revocarTodasLasUrls(queue) {
+        for (let item of queue) {
+            if (item.dataUrl && item.dataUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(item.dataUrl);
+            }
+        }
     }
 
     function renderizarCola(queue, containerId) {
@@ -575,7 +618,7 @@
         container.innerHTML = queue.map((img, idx) => `
             <div class="queue-item">
                 <img src="${img.dataUrl}" class="img-thumb">
-                <div style="flex:1; font-size:0.85rem; word-break:break-all;">${img.name}</div>
+                <div style="flex:1; font-size:0.85rem; word-break:break-all;">${escapeHtml(img.name)}</div>
                 <div class="queue-controls">
                     <button class="btn-up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>▲</button>
                     <button class="btn-down" data-idx="${idx}" ${idx === queue.length-1 ? 'disabled' : ''}>▼</button>
@@ -605,13 +648,13 @@
         container.querySelectorAll('.btn-remove').forEach(btn => {
             btn.onclick = () => {
                 const i = parseInt(btn.dataset.idx);
-                queue.splice(i, 1);
+                const removed = queue.splice(i, 1)[0];
+                if (removed && removed.dataUrl) URL.revokeObjectURL(removed.dataUrl);
                 renderizarCola(queue, containerId);
             };
         });
     }
 
-    // Función para convertir la cola completa a PDF (con perspectiva opcional por imagen)
     async function convertirColaAPdf(queue, statusEl, previewContainerId) {
         if (queue.length === 0) {
             alert('Agrega al menos una imagen');
@@ -623,9 +666,8 @@
         for (let i = 0; i < total; i++) {
             statusEl.innerHTML = `<span class="spinner"></span> Procesando imagen ${i+1} de ${total}...`;
             const imgObj = queue[i];
-            // Pedir corrección de perspectiva para cada una
             const dataUrlCorregida = await abrirPerspectiva(imgObj.element);
-            if (dataUrlCorregida === null) { // cancelado
+            if (dataUrlCorregida === null) {
                 statusEl.innerText = '❌ Conversión cancelada';
                 return;
             }
@@ -637,13 +679,71 @@
             const drawWidth = imgWidthPx * ratio, drawHeight = imgHeightPx * ratio;
             const x = (PAGE_WIDTH_MM - drawWidth) / 2, y = (PAGE_HEIGHT_MM - drawHeight) / 2;
             pdf.addImage(dataUrlCorregida, 'JPEG', x, y, drawWidth, drawHeight);
-            agregarMarcaAgua(pdf);
+            if (dataUrlCorregida !== imgObj.dataUrl && dataUrlCorregida.startsWith('blob:')) {
+                URL.revokeObjectURL(dataUrlCorregida);
+            }
         }
+        agregarMarcaAgua(pdf);
         pdf.save(`scan_${Date.now()}.pdf`);
         statusEl.innerHTML = `✅ PDF de ${total} páginas generado.`;
-        // Limpiar cola después de conversión exitosa
+        revocarTodasLasUrls(queue);
         queue.length = 0;
         renderizarCola(queue, previewContainerId);
+    }
+
+    // ==================== CÁMARA INTERNA (sin salir de la app) ====================
+    async function iniciarCamara(queue, previewContainerId, statusId) {
+        currentQueueTarget = queue;
+        currentPreviewContainerId = previewContainerId;
+        currentStatusId = statusId;
+        const modal = document.getElementById('cameraModal');
+        const video = document.getElementById('cameraVideo');
+        const loadingDiv = document.getElementById('cameraLoading');
+        modal.classList.add('activo');
+        loadingDiv.style.display = 'block';
+        try {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            currentStream = stream;
+            video.srcObject = stream;
+            await video.play();
+            loadingDiv.style.display = 'none';
+        } catch (err) {
+            loadingDiv.innerText = '❌ Error al acceder a la cámara: ' + err.message;
+            console.error(err);
+        }
+    }
+
+    function capturarFoto() {
+        const video = document.getElementById('cameraVideo');
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        canvas.toBlob(blob => {
+            if (blob) {
+                const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                agregarImagen(file, currentQueueTarget, currentPreviewContainerId);
+            }
+        }, 'image/jpeg', 0.92);
+    }
+
+    function cerrarCamara() {
+        const modal = document.getElementById('cameraModal');
+        modal.classList.remove('activo');
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+        const video = document.getElementById('cameraVideo');
+        video.srcObject = null;
+        currentQueueTarget = null;
     }
 
     // ==================== AUTENTICACIÓN Y PANTALLAS ====================
@@ -677,24 +777,41 @@
     async function verificarUsuario(user) {
         if (!user) { mostrarPantalla('login'); return; }
         currentUser = user;
-        isAdmin = user.email === ADMIN_EMAIL;
         try {
             const docRef = db.collection('users').doc(user.uid);
             const doc = await docRef.get();
-            if (!doc.exists) {
-                const esAdmin = user.email === ADMIN_EMAIL;
+            // Verificar si el usuario tiene rol de administrador (seguridad real)
+            let esAdmin = false;
+            if (doc.exists && doc.data().rol === 'admin') {
+                esAdmin = true;
+            } else if (user.email === ADMIN_EMAIL && !doc.exists) {
+                // Solo la primera vez que se registra el admin, se le asigna rol admin
                 await docRef.set({
                     email: user.email,
                     fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
-                    plan: 'trial_30d', aprobado: esAdmin,
-                    estado: esAdmin ? 'aprobado' : 'pendiente', diasRestantes: 30
+                    plan: 'trial_30d', aprobado: true,
+                    estado: 'aprobado', diasRestantes: 30,
+                    rol: 'admin'
                 });
-                if (esAdmin) { mostrarPantalla('admin'); await cargarUsuariosAdmin(); }
-                else mostrarPantalla('pending');
+                esAdmin = true;
+            }
+            if (esAdmin) {
+                isAdmin = true;
+                mostrarPantalla('admin');
+                await cargarUsuariosAdmin();
+                return;
+            }
+            if (!doc.exists) {
+                await docRef.set({
+                    email: user.email,
+                    fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
+                    plan: 'trial_30d', aprobado: false,
+                    estado: 'pendiente', diasRestantes: 30
+                });
+                mostrarPantalla('pending');
                 return;
             }
             userData = doc.data();
-            if (isAdmin) { mostrarPantalla('admin'); await cargarUsuariosAdmin(); return; }
             if (userData.aprobado === true && userData.estado === 'aprobado') {
                 const fechaBase = (userData.fechaAprobacion || userData.fechaRegistro)?.toDate() || new Date();
                 const diasRestantes = Math.max(0, 30 - Math.floor((new Date() - fechaBase) / 86400000));
@@ -721,6 +838,7 @@
             const pendientes = [], aprobados = [], rechazados = [];
             snapshot.forEach(doc => {
                 const d = { ...doc.data(), id: doc.id };
+                if (d.rol === 'admin') return; // ocultar admin de las listas
                 const estado = (d.estado || 'pendiente').toLowerCase();
                 if (estado === 'pendiente') pendientes.push(d);
                 else if (estado === 'aprobado') aprobados.push(d);
@@ -734,7 +852,7 @@
                     const estado = (u.estado || 'pendiente').toLowerCase();
                     return `<div class="user-row">
                         <div class="user-info">
-                            <div style="font-weight:bold;word-break:break-all;">${u.email}</div>
+                            <div style="font-weight:bold;word-break:break-all;">${escapeHtml(u.email)}</div>
                             <div style="font-size:0.75rem;color:#6b7280;">${fecha} | <span class="${estado}">${estado.toUpperCase()}</span>${u.diasRestantes !== undefined ? ` | ${u.diasRestantes} días` : ''}</div>
                         </div>
                         <div class="user-actions">
@@ -800,26 +918,31 @@
 
     // ==================== INICIALIZACIÓN DE HERRAMIENTAS ====================
     function initImageTools(prefix, queueRef, previewId, statusId) {
-        // inputs de archivo
-        document.getElementById(`cameraInput${prefix}`).addEventListener('change', e => {
-            if (e.target.files.length) {
-                agregarImagen(e.target.files[0], queueRef, previewId);
-                e.target.value = '';
-            }
-        });
-        document.getElementById(`galleryInput${prefix}`).addEventListener('change', e => {
-            if (e.target.files.length) {
-                agregarImagen(e.target.files[0], queueRef, previewId);
-                e.target.value = '';
-            }
-        });
-        // botón de vaciar lista (si existe)
+        // Botón de cámara interna
+        const cameraBtn = document.getElementById(`cameraBtn${prefix}`);
+        if (cameraBtn) {
+            cameraBtn.onclick = () => iniciarCamara(queueRef, previewId, statusId);
+        }
+        // Galería
+        const galleryInput = document.getElementById(`galleryInput${prefix}`);
+        if (galleryInput) {
+            galleryInput.addEventListener('change', e => {
+                if (e.target.files.length) {
+                    agregarImagen(e.target.files[0], queueRef, previewId);
+                    e.target.value = '';
+                }
+            });
+        }
+        // Vaciar lista
         const clearBtn = document.getElementById(`clearQueue${prefix}`);
-        if (clearBtn) clearBtn.onclick = () => {
-            queueRef.length = 0;
-            renderizarCola(queueRef, previewId);
-        };
-        // botón convertir
+        if (clearBtn) {
+            clearBtn.onclick = () => {
+                revocarTodasLasUrls(queueRef);
+                queueRef.length = 0;
+                renderizarCola(queueRef, previewId);
+            };
+        }
+        // Convertir
         const convertBtnId = prefix === '' ? 'convertToPdfBtn' : 'convertBtnA';
         document.getElementById(convertBtnId).addEventListener('click', () => {
             convertirColaAPdf(queueRef, document.getElementById(statusId), previewId);
@@ -871,6 +994,35 @@
         if (e.target.files[0]) { compBufA = await e.target.files[0].arrayBuffer(); document.getElementById('statusCompressA').innerText = `📁 ${e.target.files[0].name}`; }
     });
     document.getElementById('compressBtnA').addEventListener('click', () => comprimirPdf(compBufA, document.getElementById('statusCompressA')));
+
+    // Cerrar modal de cámara
+    document.getElementById('closeCameraBtn').addEventListener('click', cerrarCamara);
+    document.getElementById('capturePhotoBtn').addEventListener('click', capturarFoto);
+
+    // Helper para escapar HTML
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
+        });
+    }
+
+    // Mostrar advertencia sobre reglas de Firestore (en consola)
+    console.log("✅ App cargada. Recuerda configurar las reglas de Firestore para mayor seguridad:\n" +
+        "rules_version = '2';\n" +
+        "service cloud.firestore {\n" +
+        "  match /databases/{database}/documents {\n" +
+        "    match /users/{userId} {\n" +
+        "      allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'admin');\n" +
+        "      allow write: if request.auth != null && request.auth.uid == userId;\n" +
+        "      allow update: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'admin');\n" +
+        "    }\n" +
+        "  }\n" +
+        "}");
 </script>
 </body>
 </html>
