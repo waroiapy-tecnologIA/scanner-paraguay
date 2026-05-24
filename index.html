@@ -93,8 +93,8 @@
             width: 100%;
             height: auto;
             display: block;
-            transform: scaleX(-1);
             background: #000;
+            /* No aplicamos transformación de espejo para que la vista previa sea natural */
         }
         #cameraOverlay {
             position: absolute;
@@ -344,7 +344,7 @@
     let currentQueueTarget = null;
     let currentPreviewContainerId = null;
     let currentStatusId = null;
-    let animationFrameId = null; // para dibujar el marco
+    let animationFrameId = null;
 
     // Firebase
     const firebaseConfig = {
@@ -668,6 +668,11 @@
             queue.push({ dataUrl: url, name: file.name || 'captura', element: img });
             renderizarCola(queue, previewContainerId);
         };
+        img.onerror = () => {
+            console.error('Error al cargar la imagen');
+            URL.revokeObjectURL(url);
+            alert('Error al procesar la imagen');
+        };
         img.src = url;
     }
 
@@ -736,13 +741,22 @@
         for (let i = 0; i < total; i++) {
             statusEl.innerHTML = `<span class="spinner"></span> Procesando imagen ${i+1} de ${total}...`;
             const imgObj = queue[i];
+            if (!imgObj.element || !imgObj.element.naturalWidth) {
+                statusEl.innerText = '❌ Error: imagen no válida';
+                return;
+            }
             const dataUrlCorregida = await abrirPerspectiva(imgObj.element);
             if (dataUrlCorregida === null) {
                 statusEl.innerText = '❌ Conversión cancelada';
                 return;
             }
+            // Asegurar que la imagen se carga correctamente
             const img = new Image();
-            await new Promise(resolve => { img.onload = resolve; img.src = dataUrlCorregida; });
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error('No se pudo cargar la imagen corregida'));
+                img.src = dataUrlCorregida;
+            });
             if (i > 0) pdf.addPage();
             const imgWidthPx = img.width, imgHeightPx = img.height;
             const ratio = Math.min(PAGE_WIDTH_MM / imgWidthPx, PAGE_HEIGHT_MM / imgHeightPx);
@@ -761,7 +775,7 @@
         renderizarCola(queue, previewContainerId);
     }
 
-    // ==================== CÁMARA INTERNA CON MARCO Y BOTÓN VERDE ====================
+    // ==================== CÁMARA INTERNA (CORREGIDA: SIN ESPEJO Y CON MARCO) ====================
     async function iniciarCamara(queue, previewContainerId, statusId) {
         currentQueueTarget = queue;
         currentPreviewContainerId = previewContainerId;
@@ -780,7 +794,16 @@
             video.srcObject = stream;
             await video.play();
             loadingDiv.style.display = 'none';
-            // Iniciar el dibujo del marco
+            // Esperar a que el video tenga dimensiones
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (video.videoWidth > 0 && video.videoHeight > 0) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+            // Iniciar dibujo del marco
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             function drawFrame() {
                 if (!video.videoWidth || video.videoWidth === 0) {
@@ -794,7 +817,7 @@
                 overlay.height = rect.height;
                 const ctxOverlay = overlay.getContext('2d');
                 ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
-                // Dibujar marco tipo hoja (proporción 1/√2 o similar)
+                // Marco de guía (tipo hoja)
                 const marginX = overlay.width * 0.1;
                 const marginY = overlay.height * 0.15;
                 const frameW = overlay.width - marginX * 2;
@@ -834,18 +857,23 @@
 
     function capturarFoto() {
         const video = document.getElementById('cameraVideo');
+        // Verificar que el video tenga dimensiones válidas
+        if (!video.videoWidth || video.videoWidth === 0) {
+            alert('La cámara aún no está lista, espera un momento');
+            return;
+        }
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        // Dibujar la imagen del video sin ninguna transformación de espejo
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
         canvas.toBlob(blob => {
             if (blob) {
                 const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
                 agregarImagen(file, currentQueueTarget, currentPreviewContainerId);
+            } else {
+                alert('Error al capturar la foto');
             }
         }, 'image/jpeg', 0.92);
     }
