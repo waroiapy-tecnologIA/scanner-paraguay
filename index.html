@@ -497,4 +497,199 @@
 
     // ============================================================
     // AUTENTICACIÓN
-    // ============================
+    // ============================================================
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            await verificarUsuario(user);
+        } else {
+            mostrarPantalla('login');
+        }
+    });
+
+    document.getElementById('registerBtn').onclick = async () => {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        if (!email || !password) {
+            authMessage.innerText = "Correo y contraseña requeridos.";
+            return;
+        }
+        try {
+            await auth.createUserWithEmailAndPassword(email, password);
+            authMessage.innerText = "Registro exitoso! Esperando aprobación del administrador.";
+        } catch (err) {
+            authMessage.innerText = "Error: " + err.message;
+        }
+    };
+
+    document.getElementById('loginBtn').onclick = async () => {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        if (!email || !password) {
+            authMessage.innerText = "Correo y contraseña requeridos.";
+            return;
+        }
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            authMessage.innerText = "";
+        } catch (err) {
+            authMessage.innerText = "Error: " + err.message;
+        }
+    };
+
+    document.getElementById('logoutBtn').onclick = async () => {
+        await auth.signOut();
+    };
+
+    document.getElementById('refreshPendingBtn').onclick = async () => {
+        if (currentUser) {
+            await verificarUsuario(currentUser);
+        }
+    };
+
+    // ============================================================
+    // FUNCIONES DEL ESCÁNER
+    // ============================================================
+    let currentImageFile = null;
+    let currentImagePreviewUrl = null;
+
+    function handleImageSelection(file) {
+        if (!file) return;
+        currentImageFile = file;
+        if (currentImagePreviewUrl) URL.revokeObjectURL(currentImagePreviewUrl);
+        currentImagePreviewUrl = URL.createObjectURL(file);
+        document.getElementById('imagePreviewArea').innerHTML = 
+            `<img src="${currentImagePreviewUrl}" style="max-width:100%; max-height:180px; border-radius:12px;"><br>✅ ${file.name}`;
+        document.getElementById('imgStatus').innerText = `Imagen cargada: ${file.name}`;
+    }
+
+    document.getElementById('cameraInput').addEventListener('change', (e) => {
+        if (e.target.files.length) handleImageSelection(e.target.files[0]);
+    });
+    document.getElementById('galleryInput').addEventListener('change', (e) => {
+        if (e.target.files.length) handleImageSelection(e.target.files[0]);
+    });
+
+    document.getElementById('convertToPdfBtn').addEventListener('click', async () => {
+        if (!currentImageFile) { alert("Selecciona una imagen."); return; }
+        const statusDiv = document.getElementById('imgStatus');
+        statusDiv.innerHTML = '<span class="spinner"></span> Convirtiendo...';
+        try {
+            const img = new Image();
+            img.src = currentImagePreviewUrl;
+            await new Promise(r => img.onload = r);
+            const { jsPDF } = window.jspdf;
+            let pdf = new jsPDF({ orientation: img.width > img.height ? 'landscape' : 'portrait', unit: 'mm' });
+            let imgWidth = pdf.internal.pageSize.getWidth();
+            let imgHeight = (img.height * imgWidth) / img.width;
+            pdf.addImage(currentImagePreviewUrl, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+            pdf.save(`scan_${Date.now()}.pdf`);
+            statusDiv.innerText = "✅ PDF descargado.";
+        } catch (err) { statusDiv.innerText = "Error: " + err.message; }
+    });
+
+    let selectedPdfFiles = [];
+    document.getElementById('unionPdfInput').addEventListener('change', (e) => {
+        selectedPdfFiles = Array.from(e.target.files);
+        document.getElementById('mergeListArea').innerText = selectedPdfFiles.length 
+            ? `✅ ${selectedPdfFiles.length} PDFs seleccionados` : "Ninguno";
+    });
+
+    document.getElementById('mergeBtn').addEventListener('click', async () => {
+        if (selectedPdfFiles.length < 2) { alert("Selecciona al menos 2 PDFs."); return; }
+        const status = document.getElementById('mergeStatus');
+        status.innerHTML = '<span class="spinner"></span> Uniendo...';
+        try {
+            const { PDFDocument } = PDFLib;
+            const merged = await PDFDocument.create();
+            for (const file of selectedPdfFiles) {
+                const arrayBuf = await file.arrayBuffer();
+                const pdf = await PDFDocument.load(arrayBuf);
+                const pages = await merged.copyPages(pdf, pdf.getPageIndices());
+                pages.forEach(p => merged.addPage(p));
+            }
+            const pdfBytes = await merged.save();
+            saveAs(new Blob([pdfBytes], {type:'application/pdf'}), `union_${Date.now()}.pdf`);
+            status.innerText = "✅ Unión completada.";
+        } catch(err) { status.innerText = "Error: " + err.message; }
+    });
+
+    let splitPdfBuffer = null;
+    document.getElementById('splitPdfInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            splitPdfBuffer = await file.arrayBuffer();
+            document.getElementById('splitStatus').innerHTML = `✅ PDF cargado: ${file.name}`;
+        }
+    });
+
+    document.getElementById('splitDoBtn').addEventListener('click', async () => {
+        if (!splitPdfBuffer) { alert("Carga un PDF."); return; }
+        let start = parseInt(document.getElementById('pagInicio').value);
+        let end = parseInt(document.getElementById('pagFin').value);
+        if (isNaN(start) || isNaN(end) || start < 1 || end < start) { alert("Rango inválido"); return; }
+        const status = document.getElementById('splitStatus');
+        status.innerHTML = '<span class="spinner"></span> Dividiendo...';
+        try {
+            const { PDFDocument } = PDFLib;
+            const src = await PDFDocument.load(splitPdfBuffer);
+            const total = src.getPageCount();
+            if (end > total) { alert(`Solo ${total} págs`); return; }
+            const newDoc = await PDFDocument.create();
+            const indices = Array.from({length: end - start + 1}, (_, i) => start - 1 + i);
+            const pages = await newDoc.copyPages(src, indices);
+            pages.forEach(p => newDoc.addPage(p));
+            const bytes = await newDoc.save();
+            saveAs(new Blob([bytes], {type:'application/pdf'}), `paginas_${start}_a_${end}.pdf`);
+            status.innerText = "✅ Listo.";
+        } catch(err) { status.innerText = "Error: " + err.message; }
+    });
+
+    let compressPdfBuffer = null;
+    document.getElementById('compressPdfInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            compressPdfBuffer = await file.arrayBuffer();
+            document.getElementById('compressStatus').innerHTML = `📁 PDF cargado: ${file.name}`;
+        }
+    });
+
+    document.getElementById('compressBtn').addEventListener('click', async () => {
+        if (!compressPdfBuffer) { alert("Carga un PDF."); return; }
+        const status = document.getElementById('compressStatus');
+        status.innerHTML = '<span class="spinner"></span> Comprimiendo...';
+        try {
+            const pdf = await pdfjsLib.getDocument({ data: compressPdfBuffer }).promise;
+            const { jsPDF } = window.jspdf;
+            const newPdf = new jsPDF();
+            const CALIDAD_JPEG = 0.3;
+            const ESCALA = 1.5;
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                status.innerHTML = `<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`;
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: ESCALA });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                const imgData = canvas.toDataURL('image/jpeg', CALIDAD_JPEG);
+                const imgWidth = newPdf.internal.pageSize.getWidth();
+                const imgHeight = (viewport.height * imgWidth) / viewport.width;
+                if (i > 1) newPdf.addPage();
+                newPdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+            }
+            
+            const origKB = compressPdfBuffer.byteLength / 1024;
+            const output = newPdf.output('arraybuffer');
+            const newKB = output.byteLength / 1024;
+            saveAs(new Blob([output], { type: 'application/pdf' }), `comprimido_${Date.now()}.pdf`);
+            status.innerHTML = `✅ ${origKB.toFixed(0)}KB → ${newKB.toFixed(0)}KB <span style="color:#2c7a4d; font-weight:bold;">(${((1 - newKB/origKB) * 100).toFixed(0)}% reducción)</span>`;
+        } catch(err) { 
+            status.innerText = "Error: " + err.message; 
+            console.error(err);
+        }
+    });
+</script>
+</body>
+</html>
