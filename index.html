@@ -129,18 +129,11 @@
                         <input type="file" id="cameraInputA" accept="image/*" capture="environment" style="display:none;">
                     </label>
                     <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
-                        <input type="file" id="galleryInputA" accept="image/*" multiple style="display:none;">
+                        <input type="file" id="galleryInputA" accept="image/*" style="display:none;">
                     </label>
                 </div>
-                <div id="photoCountBadgeA" style="display:none; background:#e0f2fe; border-radius:12px; padding:8px 12px; margin:8px 0; font-size:0.88rem; color:#0369a1; font-weight:bold;">
-                    📷 <span id="photoCountA">0</span> foto(s) en cola
-                    <button id="clearPhotosBtnA" style="background:#dc2626; padding:4px 10px; font-size:0.78rem; margin-left:8px; border-radius:20px;">🗑️ Limpiar</button>
-                </div>
-                <div class="preview-area" id="previewA" style="display:flex; flex-wrap:wrap; gap:8px; min-height:50px;">🖼️ Las fotos capturadas aparecerán aquí</div>
-                <div class="btn-group" style="margin-top:10px;">
-                    <button id="convertBtnA" style="background:#2c7a4d;">📑 Foto a PDF (1 página)</button>
-                    <button id="convertAllBtnA" style="background:#1e3c72; display:none;">📚 Unir todas → 1 PDF</button>
-                </div>
+                <button id="convertBtnA">📑 Convertir a PDF</button>
+                <div class="preview-area" id="previewA">🖼️ Vista previa</div>
                 <div class="status" id="statusImgA"></div>
             </div>
 
@@ -187,19 +180,11 @@
                     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
                 </label>
                 <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
-                    <input type="file" id="galleryInput" accept="image/*" multiple style="display:none;">
+                    <input type="file" id="galleryInput" accept="image/*" style="display:none;">
                 </label>
             </div>
-            <!-- Contador y lista de fotos capturadas -->
-            <div id="photoCountBadge" style="display:none; background:#e0f2fe; border-radius:12px; padding:8px 12px; margin:8px 0; font-size:0.88rem; color:#0369a1; font-weight:bold;">
-                📷 <span id="photoCount">0</span> foto(s) en cola
-                <button id="clearPhotosBtn" style="background:#dc2626; padding:4px 10px; font-size:0.78rem; margin-left:8px; border-radius:20px;">🗑️ Limpiar</button>
-            </div>
-            <div class="preview-area" id="imagePreviewArea" style="display:flex; flex-wrap:wrap; gap:8px; min-height:50px;">🖼️ Las fotos capturadas aparecerán aquí</div>
-            <div class="btn-group" style="margin-top:10px;">
-                <button id="convertToPdfBtn" style="background:#2c7a4d;">📑 Foto a PDF (1 página)</button>
-                <button id="convertAllToPdfBtn" style="background:#1e3c72; display:none;">📚 Unir todas → 1 PDF</button>
-            </div>
+            <button id="convertToPdfBtn">📑 Convertir imagen a PDF</button>
+            <div class="preview-area" id="imagePreviewArea">🖼️ Vista previa</div>
             <div class="status" id="imgStatus"></div>
         </div>
         <div class="card">
@@ -247,6 +232,10 @@
 </div>
 
 <script>
+    // TAMAÑO DE PÁGINA PERSONALIZADO: 211,6 mm x 320,1 mm (21,16 cm x 32,01 cm)
+    const PAGE_WIDTH_MM = 211.6;
+    const PAGE_HEIGHT_MM = 320.1;
+
     const ADMIN_EMAIL = "waroiapy@gmail.com";
     const firebaseConfig = {
         apiKey: "AIzaSyCkoMbTG4L51DaavwC6Tis3ebFm6MWNZ7s",
@@ -288,14 +277,12 @@
         perspImage = imgElement;
         perspCallback = callback;
 
-        // Calcular escala para caber en pantalla
         const maxW = Math.min(window.innerWidth * 0.95, 560);
         const maxH = window.innerHeight * 0.65;
         perspScale = Math.min(maxW / imgElement.naturalWidth, maxH / imgElement.naturalHeight);
         perspCanvas.width = Math.round(imgElement.naturalWidth * perspScale);
         perspCanvas.height = Math.round(imgElement.naturalHeight * perspScale);
 
-        // Puntos iniciales: esquinas del canvas con pequeño margen
         const m = 20;
         const w = perspCanvas.width, h = perspCanvas.height;
         perspPoints = [
@@ -313,7 +300,6 @@
         ctx.clearRect(0, 0, perspCanvas.width, perspCanvas.height);
         ctx.drawImage(perspImage, 0, 0, perspCanvas.width, perspCanvas.height);
 
-        // Polígono semitransparente
         ctx.beginPath();
         ctx.moveTo(perspPoints[0].x, perspPoints[0].y);
         for (let i = 1; i < 4; i++) ctx.lineTo(perspPoints[i].x, perspPoints[i].y);
@@ -324,7 +310,6 @@
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Líneas cruzadas de guía
         ctx.setLineDash([4, 4]);
         ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.beginPath();
@@ -335,7 +320,6 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Puntos de arrastre
         const labels = ['↖', '↗', '↘', '↙'];
         perspPoints.forEach((p, i) => {
             ctx.beginPath();
@@ -389,74 +373,7 @@
     perspCanvas.addEventListener('mouseup', () => { draggingIdx = -1; });
     perspCanvas.addEventListener('touchend', () => { draggingIdx = -1; });
 
-    // Aplicar transformación de perspectiva (algoritmo de homografía bilineal)
-    function aplicarPerspectiva() {
-        // Convertir puntos de display a coordenadas originales de la imagen
-        const pts = perspPoints.map(p => ({
-            x: p.x / perspScale,
-            y: p.y / perspScale
-        }));
-
-        // Calcular ancho y alto de salida basado en las distancias
-        const ancho = Math.round(Math.max(
-            distancia(pts[0], pts[1]),
-            distancia(pts[2], pts[3])
-        ));
-        const alto = Math.round(Math.max(
-            distancia(pts[0], pts[3]),
-            distancia(pts[1], pts[2])
-        ));
-
-        const src = pts; // [TL, TR, BR, BL]
-        const dst = [
-            { x: 0,     y: 0 },
-            { x: ancho, y: 0 },
-            { x: ancho, y: alto },
-            { x: 0,     y: alto }
-        ];
-
-        const outCanvas = document.createElement('canvas');
-        outCanvas.width = ancho;
-        outCanvas.height = alto;
-        const outCtx = outCanvas.getContext('2d');
-
-        // Renderizar la imagen original en un canvas temporal a tamaño natural
-        const tmpCanvas = document.createElement('canvas');
-        tmpCanvas.width = perspImage.naturalWidth;
-        tmpCanvas.height = perspImage.naturalHeight;
-        const tmpCtx = tmpCanvas.getContext('2d');
-        tmpCtx.drawImage(perspImage, 0, 0);
-        const srcData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
-        const outData = outCtx.createImageData(ancho, alto);
-
-        // Transformación inversa: para cada pixel de salida, encontrar su origen
-        const H = calcularHomografia(dst, src); // inversa: dst->src
-
-        for (let y = 0; y < alto; y++) {
-            for (let x = 0; x < ancho; x++) {
-                const srcPt = aplicarH(H, x, y);
-                const sx = Math.round(srcPt.x);
-                const sy = Math.round(srcPt.y);
-                if (sx >= 0 && sx < tmpCanvas.width && sy >= 0 && sy < tmpCanvas.height) {
-                    const si = (sy * tmpCanvas.width + sx) * 4;
-                    const di = (y * ancho + x) * 4;
-                    outData.data[di]   = srcData.data[si];
-                    outData.data[di+1] = srcData.data[si+1];
-                    outData.data[di+2] = srcData.data[si+2];
-                    outData.data[di+3] = srcData.data[si+3];
-                }
-            }
-        }
-        outCtx.putImageData(outData, 0, 0);
-        return outCanvas.toDataURL('image/jpeg', 0.92);
-    }
-
-    function distancia(a, b) {
-        return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
-    }
-
-    // Calcular homografía 4 puntos origen -> 4 puntos destino
-    // Usando resolución de sistema lineal por eliminación gaussiana
+    function distancia(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
     function calcularHomografia(src, dst) {
         const A = [];
         for (let i = 0; i < 4; i++) {
@@ -465,7 +382,6 @@
             A.push([-sx, -sy, -1, 0, 0, 0, sx*dx, sy*dx, dx]);
             A.push([0, 0, 0, -sx, -sy, -1, sx*dy, sy*dy, dy]);
         }
-        // Eliminación gaussiana
         const n = 8;
         for (let col = 0; col < n; col++) {
             let maxRow = col;
@@ -487,33 +403,49 @@
         h[8] = 1;
         return h;
     }
-
     function aplicarH(H, x, y) {
         const w = H[6]*x + H[7]*y + H[8];
         return { x: (H[0]*x + H[1]*y + H[2]) / w, y: (H[3]*x + H[4]*y + H[5]) / w };
     }
-
-    document.getElementById('perspOkBtn').onclick = () => {
-        perspModal.classList.remove('activo');
-        const dataUrl = aplicarPerspectiva();
-        if (perspCallback) perspCallback(dataUrl, true);
-    };
-    document.getElementById('perspSkipBtn').onclick = () => {
-        perspModal.classList.remove('activo');
-        // Usar imagen original sin corrección
+    function aplicarPerspectiva() {
+        const pts = perspPoints.map(p => ({ x: p.x / perspScale, y: p.y / perspScale }));
+        const ancho = Math.round(Math.max(distancia(pts[0], pts[1]), distancia(pts[2], pts[3])));
+        const alto = Math.round(Math.max(distancia(pts[0], pts[3]), distancia(pts[1], pts[2])));
+        const src = pts;
+        const dst = [{ x: 0, y: 0 }, { x: ancho, y: 0 }, { x: ancho, y: alto }, { x: 0, y: alto }];
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = ancho;
+        outCanvas.height = alto;
+        const outCtx = outCanvas.getContext('2d');
         const tmpCanvas = document.createElement('canvas');
         tmpCanvas.width = perspImage.naturalWidth;
         tmpCanvas.height = perspImage.naturalHeight;
-        tmpCanvas.getContext('2d').drawImage(perspImage, 0, 0);
-        if (perspCallback) perspCallback(tmpCanvas.toDataURL('image/jpeg', 0.92), false);
-    };
-    document.getElementById('perspCancelBtn').onclick = () => {
-        perspModal.classList.remove('activo');
-        perspCallback = null;
-    };
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCtx.drawImage(perspImage, 0, 0);
+        const srcData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
+        const outData = outCtx.createImageData(ancho, alto);
+        const H = calcularHomografia(dst, src);
+        for (let y = 0; y < alto; y++) {
+            for (let x = 0; x < ancho; x++) {
+                const srcPt = aplicarH(H, x, y);
+                const sx = Math.round(srcPt.x);
+                const sy = Math.round(srcPt.y);
+                if (sx >= 0 && sx < tmpCanvas.width && sy >= 0 && sy < tmpCanvas.height) {
+                    const si = (sy * tmpCanvas.width + sx) * 4;
+                    const di = (y * ancho + x) * 4;
+                    outData.data[di]   = srcData.data[si];
+                    outData.data[di+1] = srcData.data[si+1];
+                    outData.data[di+2] = srcData.data[si+2];
+                    outData.data[di+3] = srcData.data[si+3];
+                }
+            }
+        }
+        outCtx.putImageData(outData, 0, 0);
+        return outCanvas.toDataURL('image/jpeg', 0.92);
+    }
 
     // ============================================================
-    // MARCA DE AGUA
+    // MARCA DE AGUA adaptada al nuevo tamaño
     // ============================================================
     function agregarMarcaAgua(pdf) {
         const total = pdf.internal.getNumberOfPages();
@@ -528,42 +460,33 @@
     }
 
     // ============================================================
-    // FUNCIONES PDF
+    // CONVERSIÓN A PDF CON TAMAÑO FIJO Y SIN ESTIRAMIENTO
     // ============================================================
-
-    // Tamaño Folio: 21.16 x 33.01 cm
-    const FOLIO_W = 211.6; // mm
-    const FOLIO_H = 330.1; // mm
-
-    // Calcula dimensiones auto-ajustadas manteniendo proporción dentro del folio
-    function fitImageEnFolio(imgW, imgH, landscape) {
-        const pageW = landscape ? FOLIO_H : FOLIO_W;
-        const pageH = landscape ? FOLIO_W : FOLIO_H;
-        const ratio = Math.min(pageW / imgW, pageH / imgH);
-        const w = imgW * ratio;
-        const h = imgH * ratio;
-        const x = (pageW - w) / 2;
-        const y = (pageH - h) / 2;
-        return { pageW, pageH, w, h, x, y };
-    }
-
     function convertirDataUrlAPdf(dataUrl, statusEl) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
                 try {
                     const { jsPDF } = window.jspdf;
-                    const landscape = img.width > img.height;
-                    const fit = fitImageEnFolio(img.width, img.height, landscape);
                     const pdf = new jsPDF({
-                        orientation: landscape ? 'landscape' : 'portrait',
                         unit: 'mm',
-                        format: [FOLIO_W, FOLIO_H]
+                        format: [PAGE_WIDTH_MM, PAGE_HEIGHT_MM]
                     });
-                    pdf.addImage(dataUrl, 'JPEG', fit.x, fit.y, fit.w, fit.h, undefined, 'FAST');
+                    const pageWidth = PAGE_WIDTH_MM;
+                    const pageHeight = PAGE_HEIGHT_MM;
+                    
+                    const imgWidthPx = img.width;
+                    const imgHeightPx = img.height;
+                    const ratio = Math.min(pageWidth / imgWidthPx, pageHeight / imgHeightPx);
+                    const drawWidth = imgWidthPx * ratio;
+                    const drawHeight = imgHeightPx * ratio;
+                    const x = (pageWidth - drawWidth) / 2;
+                    const y = (pageHeight - drawHeight) / 2;
+                    
+                    pdf.addImage(dataUrl, 'JPEG', x, y, drawWidth, drawHeight, undefined, 'FAST');
                     agregarMarcaAgua(pdf);
                     pdf.save(`scan_${Date.now()}.pdf`);
-                    statusEl.innerText = "✅ PDF descargado.";
+                    statusEl.innerText = "✅ PDF descargado. Puedes capturar otra imagen.";
                     resolve();
                 } catch(err) { reject(err); }
             };
@@ -572,43 +495,7 @@
         });
     }
 
-    // Convierte un array de dataUrls a un PDF multi-página folio
-    function convertirVariasImagenesAPdf(dataUrls, statusEl) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const { jsPDF } = window.jspdf;
-                let pdf = null;
-                for (let i = 0; i < dataUrls.length; i++) {
-                    await new Promise((res, rej) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const landscape = img.width > img.height;
-                            const fit = fitImageEnFolio(img.width, img.height, landscape);
-                            if (!pdf) {
-                                pdf = new jsPDF({
-                                    orientation: landscape ? 'landscape' : 'portrait',
-                                    unit: 'mm',
-                                    format: [FOLIO_W, FOLIO_H]
-                                });
-                            } else {
-                                pdf.addPage([FOLIO_W, FOLIO_H], landscape ? 'landscape' : 'portrait');
-                            }
-                            pdf.addImage(dataUrls[i], 'JPEG', fit.x, fit.y, fit.w, fit.h, undefined, 'FAST');
-                            res();
-                        };
-                        img.onerror = rej;
-                        img.src = dataUrls[i];
-                    });
-                    statusEl.innerHTML = `<span class="spinner"></span> Procesando foto ${i+1} de ${dataUrls.length}...`;
-                }
-                agregarMarcaAgua(pdf);
-                pdf.save(`scan_multi_${Date.now()}.pdf`);
-                statusEl.innerText = `✅ PDF con ${dataUrls.length} página(s) descargado.`;
-                resolve();
-            } catch(err) { reject(err); }
-        });
-    }
-
+    // Helper para abrir perspectiva y convertir
     function abrirPerspYConvertir(imgElement, statusEl, previewEl) {
         abrirPerspectiva(imgElement, async (dataUrl, corregido) => {
             statusEl.innerHTML = '<span class="spinner"></span> Generando PDF...';
@@ -617,10 +504,16 @@
             }
             try {
                 await convertirDataUrlAPdf(dataUrl, statusEl);
+                // Limpiar los inputs de archivo para permitir captura continua del mismo archivo
+                const cameraInputs = document.querySelectorAll('input[type="file"][accept*="image"]');
+                cameraInputs.forEach(input => { input.value = ''; });
             } catch(err) { statusEl.innerText = "Error: " + err.message; }
         });
     }
 
+    // ============================================================
+    // FUNCIONES PDF ADICIONALES (unir, dividir, comprimir)
+    // ============================================================
     async function unirPdfs(files, statusEl) {
         if (files.length < 2) { alert("Selecciona al menos 2 PDFs."); return; }
         statusEl.innerHTML = '<span class="spinner"></span> Uniendo...';
@@ -633,7 +526,6 @@
                 const pages = await merged.copyPages(pdf, pdf.getPageIndices());
                 pages.forEach(p => merged.addPage(p));
             }
-            // Marca de agua en cada página con pdf-lib
             const { rgb } = PDFLib;
             const helvetica = await merged.embedFont(PDFLib.StandardFonts.Helvetica);
             const pages = merged.getPages();
@@ -664,7 +556,6 @@
             const indices = Array.from({length: end - start + 1}, (_, i) => start - 1 + i);
             const pages = await newDoc.copyPages(src, indices);
             pages.forEach(p => newDoc.addPage(p));
-            // Marca de agua en cada página con pdf-lib
             const { rgb } = PDFLib;
             const helvetica = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
             const outPages = newDoc.getPages();
@@ -688,7 +579,8 @@
         try {
             const pdf = await pdfjsLib.getDocument({ data: buffer.slice(0) }).promise;
             const { jsPDF } = window.jspdf;
-            const newPdf = new jsPDF({ unit: 'mm', format: [FOLIO_W, FOLIO_H] });
+            // Usar el mismo tamaño de página personalizado
+            const newPdf = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH_MM, PAGE_HEIGHT_MM] });
             for (let i = 1; i <= pdf.numPages; i++) {
                 statusEl.innerHTML = `<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`;
                 const page = await pdf.getPage(i);
@@ -697,10 +589,15 @@
                 canvas.width = viewport.width; canvas.height = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 const imgData = canvas.toDataURL('image/jpeg', 0.3);
-                const landscape = viewport.width > viewport.height;
-                const fit = fitImageEnFolio(viewport.width, viewport.height, landscape);
-                if (i > 1) newPdf.addPage([FOLIO_W, FOLIO_H], landscape ? 'landscape' : 'portrait');
-                newPdf.addImage(imgData, 'JPEG', fit.x, fit.y, fit.w, fit.h);
+                const pageWidth = PAGE_WIDTH_MM;
+                const pageHeight = PAGE_HEIGHT_MM;
+                const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+                const drawWidth = canvas.width * ratio;
+                const drawHeight = canvas.height * ratio;
+                const x = (pageWidth - drawWidth) / 2;
+                const y = (pageHeight - drawHeight) / 2;
+                if (i > 1) newPdf.addPage();
+                newPdf.addImage(imgData, 'JPEG', x, y, drawWidth, drawHeight);
             }
             agregarMarcaAgua(newPdf);
             const origKB = buffer.byteLength / 1024;
@@ -712,7 +609,7 @@
     }
 
     // ============================================================
-    // PANTALLAS
+    // PANTALLAS Y AUTENTICACIÓN (sin cambios)
     // ============================================================
     function mostrarPantalla(tipo) {
         authFormsDiv.style.display = 'none';
@@ -741,9 +638,6 @@
         }
     }
 
-    // ============================================================
-    // VERIFICAR USUARIO
-    // ============================================================
     async function verificarUsuario(user) {
         if (!user) { mostrarPantalla('login'); return; }
         currentUser = user;
@@ -782,10 +676,8 @@
         }
     }
 
-    // ============================================================
-    // CARGAR USUARIOS ADMIN
-    // ============================================================
     async function cargarUsuariosAdmin() {
+        // ... (código existente, sin cambios)
         ['pendingUsersList','approvedUsersList','rejectedUsersList'].forEach(id => {
             document.getElementById(id).innerHTML = '<span class="spinner" style="border-color:#1e3c72;border-top-color:transparent;"></span> Cargando...';
         });
@@ -799,39 +691,35 @@
                 else if (estado === 'aprobado') aprobados.push(d);
                 else if (estado === 'rechazado') rechazados.push(d);
             });
+            const renderizarLista = (containerId, usuarios, conAcciones) => {
+                const container = document.getElementById(containerId);
+                if (!usuarios.length) { container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No hay usuarios</p>'; return; }
+                container.innerHTML = usuarios.map(u => {
+                    const fecha = u.fechaRegistro?.toDate?.() ? u.fechaRegistro.toDate().toLocaleDateString('es-ES') : 'N/D';
+                    const estado = (u.estado || 'pendiente').toLowerCase();
+                    return `<div class="user-row">
+                        <div class="user-info">
+                            <div style="font-weight:bold;word-break:break-all;">${u.email}</div>
+                            <div style="font-size:0.75rem;color:#6b7280;">${fecha} | <span class="${estado}">${estado.toUpperCase()}</span>${u.diasRestantes !== undefined ? ` | ${u.diasRestantes} días` : ''}</div>
+                        </div>
+                        <div class="user-actions">
+                            ${conAcciones ? `<button onclick="aprobarUsuario('${u.id}')" style="background:#2c7a4d;padding:6px 12px;font-size:0.8rem;">✅</button>
+                               <button onclick="rechazarUsuario('${u.id}')" style="background:#dc2626;padding:6px 12px;font-size:0.8rem;">❌</button>`
+                            : `<button onclick="restablecerUsuario('${u.id}')" style="background:#f59e0b;color:#1e3c72;padding:6px 10px;font-size:0.75rem;">↩️</button>`}
+                        </div>
+                    </div>`;
+                }).join('');
+            };
             renderizarLista('pendingUsersList', pendientes, true);
             renderizarLista('approvedUsersList', aprobados, false);
             renderizarLista('rejectedUsersList', rechazados, false);
-        } catch (err) {
-            console.error(err);
+        } catch(err) {
             const html = `<div class="error-msg">❌ Error: ${err.message}</div>`;
             ['pendingUsersList','approvedUsersList','rejectedUsersList'].forEach(id => {
                 document.getElementById(id).innerHTML = html;
             });
         }
     }
-
-    function renderizarLista(containerId, usuarios, conAcciones) {
-        const container = document.getElementById(containerId);
-        if (!usuarios.length) { container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No hay usuarios</p>'; return; }
-        container.innerHTML = usuarios.map(u => {
-            const fecha = u.fechaRegistro?.toDate?.() ? u.fechaRegistro.toDate().toLocaleDateString('es-ES') : 'N/D';
-            const estado = (u.estado || 'pendiente').toLowerCase();
-            return `<div class="user-row">
-                <div class="user-info">
-                    <div style="font-weight:bold;word-break:break-all;">${u.email}</div>
-                    <div style="font-size:0.75rem;color:#6b7280;">${fecha} | <span class="${estado}">${estado.toUpperCase()}</span>${u.diasRestantes !== undefined ? ` | ${u.diasRestantes} días` : ''}</div>
-                </div>
-                <div class="user-actions">
-                    ${conAcciones
-                        ? `<button onclick="aprobarUsuario('${u.id}')" style="background:#2c7a4d;padding:6px 12px;font-size:0.8rem;">✅</button>
-                           <button onclick="rechazarUsuario('${u.id}')" style="background:#dc2626;padding:6px 12px;font-size:0.8rem;">❌</button>`
-                        : `<button onclick="restablecerUsuario('${u.id}')" style="background:#f59e0b;color:#1e3c72;padding:6px 10px;font-size:0.75rem;">↩️</button>`}
-                </div>
-            </div>`;
-        }).join('');
-    }
-
     window.aprobarUsuario = async (id) => {
         try { await db.collection('users').doc(id).update({ aprobado: true, estado: 'aprobado', diasRestantes: 30, fechaAprobacion: firebase.firestore.FieldValue.serverTimestamp() }); await cargarUsuariosAdmin(); }
         catch(err) { alert('Error: ' + err.message); }
@@ -847,9 +735,6 @@
         catch(err) { alert('Error: ' + err.message); }
     };
 
-    // ============================================================
-    // AUTH
-    // ============================================================
     auth.onAuthStateChanged(async (user) => {
         if (user) await verificarUsuario(user);
         else mostrarPantalla('login');
@@ -880,113 +765,32 @@
     document.getElementById('recargarUsuariosBtn').onclick = async () => { await cargarUsuariosAdmin(); };
 
     // ============================================================
-    // HELPERS DE SELECCIÓN DE IMAGEN (multi-foto)
+    // HELPERS IMAGEN (usuario y admin)
     // ============================================================
-
-    // Agrega una imagen al array de fotos en cola y actualiza la preview
-    function agregarFotoACola(file, colaDataUrls, previewEl, countBadge, countSpan, convertAllBtn) {
+    function cargarImagenDesdeFile(file, previewEl, statusEl) {
+        if (!file) return null;
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
-            colaDataUrls.push(img.src);
-            // Miniatura en preview
-            const thumb = document.createElement('div');
-            thumb.style.cssText = 'position:relative;display:inline-block;';
-            const imgEl = document.createElement('img');
-            imgEl.src = url;
-            imgEl.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid #2c7a4d;';
-            const num = document.createElement('span');
-            num.innerText = colaDataUrls.length;
-            num.style.cssText = 'position:absolute;top:2px;left:4px;background:#1e3c72;color:white;font-size:0.7rem;font-weight:bold;border-radius:10px;padding:1px 5px;';
-            thumb.appendChild(imgEl);
-            thumb.appendChild(num);
-            if (previewEl.childNodes.length === 1 && previewEl.childNodes[0].nodeType === 3) previewEl.innerHTML = '';
-            previewEl.appendChild(thumb);
-            countSpan.innerText = colaDataUrls.length;
-            countBadge.style.display = 'block';
-            if (colaDataUrls.length > 1) convertAllBtn.style.display = 'inline-block';
+            previewEl.innerHTML = `<img src="${url}" style="max-width:100%;max-height:180px;border-radius:12px;"><br>✅ ${file.name}`;
+            statusEl.innerText = `Imagen cargada: ${file.name}`;
         };
         img.src = url;
+        return img;
     }
 
-    function limpiarCola(colaDataUrls, previewEl, countBadge, convertAllBtn, defaultText) {
-        colaDataUrls.length = 0;
-        previewEl.innerHTML = defaultText;
-        countBadge.style.display = 'none';
-        convertAllBtn.style.display = 'none';
-    }
-
-    // ============================================================
-    // USUARIO NORMAL
-    // ============================================================
+    // Usuario normal
     let imgU = null;
-    let colaU = []; // dataUrls de fotos en cola
-
-    function setupCamaraUsuario() {
-        const previewEl = document.getElementById('imagePreviewArea');
-        const countBadge = document.getElementById('photoCountBadge');
-        const countSpan = document.getElementById('photoCount');
-        const convertAllBtn = document.getElementById('convertAllToPdfBtn');
-        const statusEl = document.getElementById('imgStatus');
-
-        document.getElementById('cameraInput').addEventListener('change', e => {
-            if (!e.target.files.length) return;
-            const file = e.target.files[0];
-            // Cargar como imagen para persp + cola
-            const url = URL.createObjectURL(file);
-            imgU = new Image();
-            imgU.onload = () => {
-                agregarFotoACola(file, colaU, previewEl, countBadge, countSpan, convertAllBtn);
-                statusEl.innerText = `📷 Foto ${colaU.length} añadida. Puedes sacar otra.`;
-            };
-            imgU.src = url;
-            // Reset input para poder volver a disparar con la misma cámara
-            e.target.value = '';
-        });
-
-        document.getElementById('galleryInput').addEventListener('change', e => {
-            if (!e.target.files.length) return;
-            Array.from(e.target.files).forEach(file => {
-                const url = URL.createObjectURL(file);
-                const img = new Image();
-                img.onload = () => {
-                    imgU = img;
-                    agregarFotoACola(file, colaU, previewEl, countBadge, countSpan, convertAllBtn);
-                };
-                img.src = url;
-            });
-            statusEl.innerText = `🖼️ ${e.target.files.length} imagen(es) añadida(s).`;
-            e.target.value = '';
-        });
-
-        document.getElementById('convertToPdfBtn').addEventListener('click', () => {
-            if (!imgU && colaU.length === 0) { alert("Captura al menos una foto."); return; }
-            if (colaU.length > 0) {
-                // Convertir última foto (última en la cola)
-                const lastDataUrl = colaU[colaU.length - 1];
-                const tmpImg = new Image();
-                tmpImg.onload = () => abrirPerspYConvertir(tmpImg, statusEl, previewEl);
-                tmpImg.src = lastDataUrl;
-            } else {
-                abrirPerspYConvertir(imgU, statusEl, previewEl);
-            }
-        });
-
-        document.getElementById('convertAllToPdfBtn').addEventListener('click', async () => {
-            if (colaU.length < 2) { alert("Necesitas al menos 2 fotos para unir."); return; }
-            statusEl.innerHTML = '<span class="spinner"></span> Generando PDF multi-página...';
-            try {
-                await convertirVariasImagenesAPdf(colaU, statusEl);
-            } catch(err) { statusEl.innerText = "Error: " + err.message; }
-        });
-
-        document.getElementById('clearPhotosBtn').addEventListener('click', () => {
-            limpiarCola(colaU, previewEl, countBadge, convertAllBtn, '🖼️ Las fotos capturadas aparecerán aquí');
-            imgU = null;
-            statusEl.innerText = '';
-        });
-    }
-    setupCamaraUsuario();
+    document.getElementById('cameraInput').addEventListener('change', e => {
+        if (e.target.files.length) imgU = cargarImagenDesdeFile(e.target.files[0], document.getElementById('imagePreviewArea'), document.getElementById('imgStatus'));
+    });
+    document.getElementById('galleryInput').addEventListener('change', e => {
+        if (e.target.files.length) imgU = cargarImagenDesdeFile(e.target.files[0], document.getElementById('imagePreviewArea'), document.getElementById('imgStatus'));
+    });
+    document.getElementById('convertToPdfBtn').addEventListener('click', () => {
+        if (!imgU) { alert("Selecciona una imagen."); return; }
+        abrirPerspYConvertir(imgU, document.getElementById('imgStatus'), document.getElementById('imagePreviewArea'));
+    });
 
     let mergeFiles = [];
     document.getElementById('unionPdfInput').addEventListener('change', e => {
@@ -1007,74 +811,18 @@
     });
     document.getElementById('compressBtn').addEventListener('click', () => comprimirPdf(compBuf, document.getElementById('compressStatus')));
 
-    // ============================================================
-    // ADMIN HERRAMIENTAS
-    // ============================================================
+    // Admin herramientas
     let imgA = null;
-    let colaA = [];
-
-    function setupCamaraAdmin() {
-        const previewEl = document.getElementById('previewA');
-        const countBadge = document.getElementById('photoCountBadgeA');
-        const countSpan = document.getElementById('photoCountA');
-        const convertAllBtn = document.getElementById('convertAllBtnA');
-        const statusEl = document.getElementById('statusImgA');
-
-        document.getElementById('cameraInputA').addEventListener('change', e => {
-            if (!e.target.files.length) return;
-            const file = e.target.files[0];
-            const url = URL.createObjectURL(file);
-            imgA = new Image();
-            imgA.onload = () => {
-                agregarFotoACola(file, colaA, previewEl, countBadge, countSpan, convertAllBtn);
-                statusEl.innerText = `📷 Foto ${colaA.length} añadida. Puedes sacar otra.`;
-            };
-            imgA.src = url;
-            e.target.value = '';
-        });
-
-        document.getElementById('galleryInputA').addEventListener('change', e => {
-            if (!e.target.files.length) return;
-            Array.from(e.target.files).forEach(file => {
-                const url = URL.createObjectURL(file);
-                const img = new Image();
-                img.onload = () => {
-                    imgA = img;
-                    agregarFotoACola(file, colaA, previewEl, countBadge, countSpan, convertAllBtn);
-                };
-                img.src = url;
-            });
-            statusEl.innerText = `🖼️ ${e.target.files.length} imagen(es) añadida(s).`;
-            e.target.value = '';
-        });
-
-        document.getElementById('convertBtnA').addEventListener('click', () => {
-            if (!imgA && colaA.length === 0) { alert("Captura al menos una foto."); return; }
-            if (colaA.length > 0) {
-                const lastDataUrl = colaA[colaA.length - 1];
-                const tmpImg = new Image();
-                tmpImg.onload = () => abrirPerspYConvertir(tmpImg, statusEl, previewEl);
-                tmpImg.src = lastDataUrl;
-            } else {
-                abrirPerspYConvertir(imgA, statusEl, previewEl);
-            }
-        });
-
-        document.getElementById('convertAllBtnA').addEventListener('click', async () => {
-            if (colaA.length < 2) { alert("Necesitas al menos 2 fotos para unir."); return; }
-            statusEl.innerHTML = '<span class="spinner"></span> Generando PDF multi-página...';
-            try {
-                await convertirVariasImagenesAPdf(colaA, statusEl);
-            } catch(err) { statusEl.innerText = "Error: " + err.message; }
-        });
-
-        document.getElementById('clearPhotosBtnA').addEventListener('click', () => {
-            limpiarCola(colaA, previewEl, countBadge, convertAllBtn, '🖼️ Las fotos capturadas aparecerán aquí');
-            imgA = null;
-            statusEl.innerText = '';
-        });
-    }
-    setupCamaraAdmin();
+    document.getElementById('cameraInputA').addEventListener('change', e => {
+        if (e.target.files.length) imgA = cargarImagenDesdeFile(e.target.files[0], document.getElementById('previewA'), document.getElementById('statusImgA'));
+    });
+    document.getElementById('galleryInputA').addEventListener('change', e => {
+        if (e.target.files.length) imgA = cargarImagenDesdeFile(e.target.files[0], document.getElementById('previewA'), document.getElementById('statusImgA'));
+    });
+    document.getElementById('convertBtnA').addEventListener('click', () => {
+        if (!imgA) { alert("Selecciona una imagen."); return; }
+        abrirPerspYConvertir(imgA, document.getElementById('statusImgA'), document.getElementById('previewA'));
+    });
 
     let mergeFilesA = [];
     document.getElementById('mergeInputA').addEventListener('change', e => {
@@ -1094,7 +842,6 @@
         if (e.target.files[0]) { compBufA = await e.target.files[0].arrayBuffer(); document.getElementById('statusCompressA').innerText = `📁 ${e.target.files[0].name}`; }
     });
     document.getElementById('compressBtnA').addEventListener('click', () => comprimirPdf(compBufA, document.getElementById('statusCompressA')));
-
 </script>
 </body>
 </html>
