@@ -136,10 +136,11 @@
             border-bottom: 1px solid #e2e8f0;
         }
         .user-info { flex: 1; }
-        .user-actions { display: flex; gap: 6px; }
-        .approved { color: #2c7a4d; font-weight: bold; }
-        .pending { color: #f59e0b; font-weight: bold; }
-        .rejected { color: #dc2626; font-weight: bold; }
+        .user-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .aprobado { color: #2c7a4d; font-weight: bold; }
+        .pendiente { color: #f59e0b; font-weight: bold; }
+        .rechazado { color: #dc2626; font-weight: bold; }
+        .error-msg { color: #dc2626; font-size: 0.85rem; padding: 8px; background: #fee2e2; border-radius: 10px; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -179,21 +180,23 @@
             <h2>👑 Panel de Administrador</h2>
             <div class="admin-badge">ADMIN</div>
             <p style="font-size: 0.85rem; margin-top: 8px;">Gestiona las cuentas pendientes de aprobación</p>
+            <!-- FIX: Botón para recargar lista manualmente -->
+            <button id="recargarUsuariosBtn" style="background:#fbbf24; color:#1e3c72; margin-top:10px;">🔄 Recargar usuarios</button>
         </div>
-        
+
         <div class="card">
             <div style="font-weight: bold; margin-bottom: 12px;">📋 Usuarios pendientes</div>
-            <div id="pendingUsersList">Cargando...</div>
+            <div id="pendingUsersList"><span class="spinner" style="border-color:#1e3c72; border-top-color:transparent;"></span> Cargando...</div>
         </div>
-        
+
         <div class="card">
             <div style="font-weight: bold; margin-bottom: 12px;">✅ Usuarios aprobados</div>
-            <div id="approvedUsersList">Cargando...</div>
+            <div id="approvedUsersList"><span class="spinner" style="border-color:#1e3c72; border-top-color:transparent;"></span> Cargando...</div>
         </div>
-        
+
         <div class="card">
             <div style="font-weight: bold; margin-bottom: 12px;">❌ Usuarios rechazados</div>
-            <div id="rejectedUsersList">Cargando...</div>
+            <div id="rejectedUsersList"><span class="spinner" style="border-color:#1e3c72; border-top-color:transparent;"></span> Cargando...</div>
         </div>
     </div>
 
@@ -308,7 +311,7 @@
             const doc = await docRef.get();
 
             if (!doc.exists) {
-                // Usuario nuevo - crear con aprobado: false (o true si es admin)
+                // Usuario nuevo - crear documento en Firestore
                 const esAdmin = user.email === ADMIN_EMAIL;
                 await docRef.set({
                     email: user.email,
@@ -318,10 +321,11 @@
                     estado: esAdmin ? 'aprobado' : 'pendiente',
                     diasRestantes: 30
                 });
-                
+
                 if (esAdmin) {
                     userData = { aprobado: true, estado: 'aprobado', diasRestantes: 30 };
                     mostrarPantalla('admin');
+                    await cargarUsuariosAdmin();
                 } else {
                     userData = { aprobado: false, estado: 'pendiente' };
                     mostrarPantalla('pending');
@@ -331,27 +335,28 @@
 
             userData = doc.data();
 
-            // Si es admin, mostrar panel admin
+            // Si es admin, mostrar panel admin y cargar usuarios
             if (isAdmin) {
                 mostrarPantalla('admin');
-                cargarUsuariosAdmin();
+                await cargarUsuariosAdmin();
                 return;
             }
 
             // Si no es admin, verificar aprobación
             if (userData.aprobado === true && userData.estado === 'aprobado') {
-                const fechaRegistro = userData.fechaRegistro?.toDate() || new Date();
+                // FIX: usar fechaAprobacion si existe, sino fechaRegistro
+                const fechaBase = (userData.fechaAprobacion || userData.fechaRegistro)?.toDate() || new Date();
                 const ahora = new Date();
-                const diffDays = Math.floor((ahora - fechaRegistro) / (1000 * 60 * 60 * 24));
+                const diffDays = Math.floor((ahora - fechaBase) / (1000 * 60 * 60 * 24));
                 const diasRestantes = Math.max(0, 30 - diffDays);
 
                 if (diasRestantes > 0) {
                     planStatusSpan.innerHTML = `✅ Plan activo: ${diasRestantes} día(s) restantes`;
-                    mostrarPantalla('app');
                 } else {
                     planStatusSpan.innerHTML = `⛔ Plan expirado`;
-                    mostrarPantalla('app');
                 }
+                mostrarPantalla('app');
+
             } else if (userData.estado === 'rechazado') {
                 planStatusSpan.innerHTML = `❌ Cuenta rechazada`;
                 mostrarPantalla('login');
@@ -362,8 +367,10 @@
             }
 
         } catch (err) {
-            console.error(err);
-            authMessage.innerText = "Error al verificar cuenta.";
+            console.error('Error verificarUsuario:', err);
+            // FIX: mostrar error visible en pantalla
+            authMessage.innerText = "Error al verificar cuenta: " + err.message;
+            mostrarPantalla('login');
         }
     }
 
@@ -376,6 +383,7 @@
         appFunctionsDiv.style.display = 'none';
         pendingScreenDiv.style.display = 'none';
         adminPanelDiv.style.display = 'none';
+        adminBadgeContainer.innerHTML = '';
 
         switch(tipo) {
             case 'login':
@@ -389,9 +397,6 @@
             case 'app':
                 appFunctionsDiv.style.display = 'block';
                 userInfoDiv.style.display = 'block';
-                if (isAdmin) {
-                    adminBadgeContainer.innerHTML = '<div class="admin-badge">ADMIN</div>';
-                }
                 break;
             case 'admin':
                 adminPanelDiv.style.display = 'block';
@@ -404,10 +409,24 @@
 
     // ============================================================
     // PANEL ADMIN - CARGAR USUARIOS
+    // FIX PRINCIPAL: manejo de errores visible + await correcto
     // ============================================================
     async function cargarUsuariosAdmin() {
+        // Mostrar spinners mientras carga
+        document.getElementById('pendingUsersList').innerHTML = '<span class="spinner" style="border-color:#1e3c72; border-top-color:transparent;"></span> Cargando...';
+        document.getElementById('approvedUsersList').innerHTML = '<span class="spinner" style="border-color:#1e3c72; border-top-color:transparent;"></span> Cargando...';
+        document.getElementById('rejectedUsersList').innerHTML = '<span class="spinner" style="border-color:#1e3c72; border-top-color:transparent;"></span> Cargando...';
+
         try {
             const snapshot = await db.collection('users').get();
+
+            if (snapshot.empty) {
+                renderizarLista('pendingUsersList', [], true);
+                renderizarLista('approvedUsersList', [], false);
+                renderizarLista('rejectedUsersList', [], false);
+                return;
+            }
+
             const pendientes = [];
             const aprobados = [];
             const rechazados = [];
@@ -415,9 +434,11 @@
             snapshot.forEach(doc => {
                 const data = doc.data();
                 data.id = doc.id;
-                if (data.estado === 'pendiente') pendientes.push(data);
-                else if (data.estado === 'aprobado') aprobados.push(data);
-                else if (data.estado === 'rechazado') rechazados.push(data);
+                // FIX: normalizar estado por si acaso viene vacío o undefined
+                const estado = (data.estado || 'pendiente').toLowerCase();
+                if (estado === 'pendiente') pendientes.push(data);
+                else if (estado === 'aprobado') aprobados.push(data);
+                else if (estado === 'rechazado') rechazados.push(data);
             });
 
             renderizarLista('pendingUsersList', pendientes, true);
@@ -425,10 +446,16 @@
             renderizarLista('rejectedUsersList', rechazados, false);
 
         } catch (err) {
-            console.error(err);
+            console.error('Error cargarUsuariosAdmin:', err);
+            // FIX: mostrar error visible en el panel, no solo en consola
+            const errorHtml = `<div class="error-msg">❌ Error al cargar usuarios: ${err.message}<br>Verifica las reglas de Firestore.</div>`;
+            document.getElementById('pendingUsersList').innerHTML = errorHtml;
+            document.getElementById('approvedUsersList').innerHTML = errorHtml;
+            document.getElementById('rejectedUsersList').innerHTML = errorHtml;
         }
     }
 
+    // FIX: clases CSS corregidas (aprobado/pendiente/rechazado en lugar de approved/pending/rejected)
     function renderizarLista(containerId, usuarios, conAcciones) {
         const container = document.getElementById(containerId);
         if (usuarios.length === 0) {
@@ -438,26 +465,33 @@
 
         let html = '';
         usuarios.forEach(u => {
-            const fecha = u.fechaRegistro?.toDate?.() 
-                ? u.fechaRegistro.toDate().toLocaleDateString('es-ES') 
+            const fecha = u.fechaRegistro?.toDate?.()
+                ? u.fechaRegistro.toDate().toLocaleDateString('es-ES')
                 : 'Fecha no disponible';
-            
+
+            const estadoClase = (u.estado || 'pendiente').toLowerCase();
+            const estadoTexto = (u.estado || 'pendiente').toUpperCase();
+
             html += `
                 <div class="user-row">
                     <div class="user-info">
-                        <div style="font-weight: bold;">${u.email}</div>
+                        <div style="font-weight: bold; word-break: break-all;">${u.email || 'Sin correo'}</div>
                         <div style="font-size: 0.75rem; color: #6b7280;">
-                            Registro: ${fecha} | 
-                            <span class="${u.estado}">${u.estado.toUpperCase()}</span>
+                            Registro: ${fecha} |
+                            <span class="${estadoClase}">${estadoTexto}</span>
                             ${u.diasRestantes !== undefined ? ` | ${u.diasRestantes} días` : ''}
                         </div>
                     </div>
                     ${conAcciones ? `
                         <div class="user-actions">
-                            <button onclick="aprobarUsuario('${u.id}')" style="background:#2c7a4d; padding:6px 12px; font-size:0.8rem;">✅ Aprobar</button>
-                            <button onclick="rechazarUsuario('${u.id}')" style="background:#dc2626; padding:6px 12px; font-size:0.8rem;">❌ Rechazar</button>
+                            <button onclick="aprobarUsuario('${u.id}')" style="background:#2c7a4d; padding:6px 12px; font-size:0.8rem;">✅</button>
+                            <button onclick="rechazarUsuario('${u.id}')" style="background:#dc2626; padding:6px 12px; font-size:0.8rem;">❌</button>
                         </div>
-                    ` : ''}
+                    ` : `
+                        <div class="user-actions">
+                            <button onclick="restablecerUsuario('${u.id}')" style="background:#f59e0b; color:#1e3c72; padding:6px 10px; font-size:0.75rem;">↩️</button>
+                        </div>
+                    `}
                 </div>
             `;
         });
@@ -475,9 +509,9 @@
                 diasRestantes: 30,
                 fechaAprobacion: firebase.firestore.FieldValue.serverTimestamp()
             });
-            cargarUsuariosAdmin();
+            await cargarUsuariosAdmin();
         } catch (err) {
-            alert('Error: ' + err.message);
+            alert('Error al aprobar: ' + err.message);
         }
     };
 
@@ -489,9 +523,23 @@
                 estado: 'rechazado',
                 fechaRechazo: firebase.firestore.FieldValue.serverTimestamp()
             });
-            cargarUsuariosAdmin();
+            await cargarUsuariosAdmin();
         } catch (err) {
-            alert('Error: ' + err.message);
+            alert('Error al rechazar: ' + err.message);
+        }
+    };
+
+    // FIX: nueva función para restablecer un usuario aprobado/rechazado a pendiente
+    window.restablecerUsuario = async function(userId) {
+        if (!confirm('¿Restablecer este usuario a PENDIENTE?')) return;
+        try {
+            await db.collection('users').doc(userId).update({
+                aprobado: false,
+                estado: 'pendiente'
+            });
+            await cargarUsuariosAdmin();
+        } catch (err) {
+            alert('Error al restablecer: ' + err.message);
         }
     };
 
@@ -513,9 +561,13 @@
             authMessage.innerText = "Correo y contraseña requeridos.";
             return;
         }
+        if (password.length < 6) {
+            authMessage.innerText = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
         try {
             await auth.createUserWithEmailAndPassword(email, password);
-            authMessage.innerText = "Registro exitoso! Esperando aprobación del administrador.";
+            authMessage.innerText = "✅ Registro exitoso. Esperando aprobación del administrador.";
         } catch (err) {
             authMessage.innerText = "Error: " + err.message;
         }
@@ -546,6 +598,11 @@
         }
     };
 
+    // FIX: botón recargar usuarios del panel admin
+    document.getElementById('recargarUsuariosBtn').onclick = async () => {
+        await cargarUsuariosAdmin();
+    };
+
     // ============================================================
     // FUNCIONES DEL ESCÁNER
     // ============================================================
@@ -557,7 +614,7 @@
         currentImageFile = file;
         if (currentImagePreviewUrl) URL.revokeObjectURL(currentImagePreviewUrl);
         currentImagePreviewUrl = URL.createObjectURL(file);
-        document.getElementById('imagePreviewArea').innerHTML = 
+        document.getElementById('imagePreviewArea').innerHTML =
             `<img src="${currentImagePreviewUrl}" style="max-width:100%; max-height:180px; border-radius:12px;"><br>✅ ${file.name}`;
         document.getElementById('imgStatus').innerText = `Imagen cargada: ${file.name}`;
     }
@@ -576,7 +633,10 @@
         try {
             const img = new Image();
             img.src = currentImagePreviewUrl;
-            await new Promise(r => img.onload = r);
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+            });
             const { jsPDF } = window.jspdf;
             let pdf = new jsPDF({ orientation: img.width > img.height ? 'landscape' : 'portrait', unit: 'mm' });
             let imgWidth = pdf.internal.pageSize.getWidth();
@@ -590,7 +650,7 @@
     let selectedPdfFiles = [];
     document.getElementById('unionPdfInput').addEventListener('change', (e) => {
         selectedPdfFiles = Array.from(e.target.files);
-        document.getElementById('mergeListArea').innerText = selectedPdfFiles.length 
+        document.getElementById('mergeListArea').innerText = selectedPdfFiles.length
             ? `✅ ${selectedPdfFiles.length} PDFs seleccionados` : "Ninguno";
     });
 
@@ -633,7 +693,7 @@
             const { PDFDocument } = PDFLib;
             const src = await PDFDocument.load(splitPdfBuffer);
             const total = src.getPageCount();
-            if (end > total) { alert(`Solo ${total} págs`); return; }
+            if (end > total) { alert(`Solo hay ${total} página(s)`); return; }
             const newDoc = await PDFDocument.create();
             const indices = Array.from({length: end - start + 1}, (_, i) => start - 1 + i);
             const pages = await newDoc.copyPages(src, indices);
@@ -658,12 +718,14 @@
         const status = document.getElementById('compressStatus');
         status.innerHTML = '<span class="spinner"></span> Comprimiendo...';
         try {
-            const pdf = await pdfjsLib.getDocument({ data: compressPdfBuffer }).promise;
+            // FIX: clonar el buffer porque pdf.js lo consume y no puede reutilizarse
+            const bufferCopy = compressPdfBuffer.slice(0);
+            const pdf = await pdfjsLib.getDocument({ data: bufferCopy }).promise;
             const { jsPDF } = window.jspdf;
             const newPdf = new jsPDF();
             const CALIDAD_JPEG = 0.3;
             const ESCALA = 1.5;
-            
+
             for (let i = 1; i <= pdf.numPages; i++) {
                 status.innerHTML = `<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`;
                 const page = await pdf.getPage(i);
@@ -679,14 +741,14 @@
                 if (i > 1) newPdf.addPage();
                 newPdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
             }
-            
+
             const origKB = compressPdfBuffer.byteLength / 1024;
             const output = newPdf.output('arraybuffer');
             const newKB = output.byteLength / 1024;
             saveAs(new Blob([output], { type: 'application/pdf' }), `comprimido_${Date.now()}.pdf`);
             status.innerHTML = `✅ ${origKB.toFixed(0)}KB → ${newKB.toFixed(0)}KB <span style="color:#2c7a4d; font-weight:bold;">(${((1 - newKB/origKB) * 100).toFixed(0)}% reducción)</span>`;
-        } catch(err) { 
-            status.innerText = "Error: " + err.message; 
+        } catch(err) {
+            status.innerText = "Error al comprimir: " + err.message;
             console.error(err);
         }
     });
