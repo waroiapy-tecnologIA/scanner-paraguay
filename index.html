@@ -4,16 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Scanner PDF Pro - Freemium 30 días</title>
-    <!-- Librerías PDF y Firebase -->
+    <!-- Librerías PDF -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- PDF.js para compresión real -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <style>
-        * { box-sizing: border-box; user-select: none; }
+        * { box-sizing: border-box; }
         body {
             font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
             background: #f0f2f5;
@@ -52,6 +54,15 @@
         }
         .btn-secondary { background: #4b5563; }
         .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 16px;
+            border-radius: 40px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
         .preview-area {
             background: #f9fafb;
             border-radius: 20px;
@@ -59,7 +70,7 @@
             margin-top: 16px;
             border: 1px solid #e2e8f0;
         }
-        .status { font-size: 0.8rem; margin-top: 8px; color: #2d3748; }
+        .status { font-size: 0.85rem; margin-top: 8px; color: #2d3748; }
         .plan-badge {
             background: #fbbf24;
             color: #1e3c72;
@@ -73,8 +84,18 @@
             opacity: 0.5;
             pointer-events: none;
         }
-        hr { margin: 12px 0; }
         h2 { font-size: 1.4rem; margin: 0 0 8px; }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 6px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -97,16 +118,16 @@
         </div>
     </div>
 
-    <!-- Funciones del escáner (se muestran solo si está logueado y plan activo) -->
+    <!-- Funciones del escáner -->
     <div id="appFunctions" style="display: none;">
         <!-- Tarjeta escáner -->
         <div class="card">
             <div style="font-weight: bold;">📸 Tomar foto y crear PDF</div>
             <div class="btn-group">
-                <label class="file-input-label" style="background:#2c7a4d; padding:12px; border-radius:40px;">📷 Cámara
+                <label class="file-input-label" style="background:#2c7a4d;">📷 Cámara
                     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
                 </label>
-                <label class="file-input-label" style="background:#4b5563; padding:12px; border-radius:40px;">🖼️ Galería
+                <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
                     <input type="file" id="galleryInput" accept="image/*" style="display:none;">
                 </label>
             </div>
@@ -118,7 +139,7 @@
         <!-- Unir PDFs -->
         <div class="card">
             <div style="font-weight: bold;">🔗 Unir PDFs</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center; padding:12px; border-radius:40px;">📂 Seleccionar varios PDFs
+            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📂 Seleccionar varios PDFs
                 <input type="file" id="unionPdfInput" accept="application/pdf" multiple style="display:none;">
             </label>
             <button id="mergeBtn">⚡ Unir PDFs</button>
@@ -129,7 +150,7 @@
         <!-- Dividir PDF -->
         <div class="card">
             <div style="font-weight: bold;">✂️ Dividir PDF (rango de páginas)</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center; padding:12px; border-radius:40px;">📁 Elegir PDF
+            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF
                 <input type="file" id="splitPdfInput" accept="application/pdf" style="display:none;">
             </label>
             <div style="display: flex; gap: 8px; margin: 10px 0;">
@@ -142,44 +163,51 @@
 
         <!-- Comprimir PDF -->
         <div class="card">
-            <div style="font-weight: bold;">🗜️ Comprimir PDF</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center; padding:12px; border-radius:40px;">📁 Elegir PDF
+            <div style="font-weight: bold;">🗜️ Comprimir PDF (reduce calidad de imágenes)</div>
+            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF
                 <input type="file" id="compressPdfInput" accept="application/pdf" style="display:none;">
             </label>
-            <button id="compressBtn">🔽 Comprimir (reduce resolución)</button>
+            <button id="compressBtn">🔽 Comprimir PDF</button>
             <div class="status" id="compressStatus"></div>
         </div>
     </div>
 </div>
 
 <script>
-    // ---------- CONFIGURACIÓN DE FIREBASE (REEMPLAZAR CON TUS DATOS) ----------
+    // ============================================================
+    // CONFIGURACIÓN DE FIREBASE (TUS CREDENCIALES REALES)
+    // ============================================================
     const firebaseConfig = {
-        apiKey: "TU_API_KEY",
-        authDomain: "TU_PROYECTO.firebaseapp.com",
-        projectId: "TU_PROYECTO",
-        storageBucket: "TU_PROYECTO.appspot.com",
-        messagingSenderId: "NUMERO",
-        appId: "TU_APP_ID"
+        apiKey: "AIzaSyCkoMbTG4L51DaavwC6Tis3ebFm6MWNZ7s",
+        authDomain: "scanner-pdf-pro-efff9.firebaseapp.com",
+        projectId: "scanner-pdf-pro-efff9",
+        storageBucket: "scanner-pdf-pro-efff9.firebasestorage.app",
+        messagingSenderId: "361131328103",
+        appId: "1:361131328103:web:d30a696d351d04564b0ac2"
     };
-    // Inicializar Firebase
+
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // Variables globales de UI
+    // Configurar PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Variables globales
     let currentUser = null;
     let planActivo = false;
     let diasRestantes = 0;
 
-    // Elementos
+    // Elementos UI
     const authFormsDiv = document.getElementById('authForms');
     const userInfoDiv = document.getElementById('userInfo');
     const appFunctionsDiv = document.getElementById('appFunctions');
     const planStatusSpan = document.getElementById('planStatus');
     const authMessage = document.getElementById('authMessage');
 
-    // --- Funciones de verificación de plan ---
+    // ============================================================
+    // FUNCIONES DE PLAN
+    // ============================================================
     async function actualizarEstadoPlan(user) {
         if (!user) {
             planActivo = false;
@@ -196,12 +224,11 @@
                 diasRestantes = Math.max(0, 30 - diffDays);
                 planActivo = diasRestantes > 0;
                 if (planActivo) {
-                    planStatusSpan.innerHTML = `✅ Plan activo: ${diasRestantes} día(s) restantes de prueba gratuita.`;
+                    planStatusSpan.innerHTML = `✅ Plan activo: ${diasRestantes} día(s) restantes`;
                 } else {
                     planStatusSpan.innerHTML = `⛔ Plan expirado. Contrata premium para seguir usando.`;
                 }
             } else {
-                // Usuario recién registrado, crear documento con fecha actual
                 await docRef.set({
                     email: user.email,
                     fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
@@ -209,14 +236,14 @@
                 });
                 planActivo = true;
                 diasRestantes = 30;
-                planStatusSpan.innerHTML = `✅ Plan activo: 30 días de prueba gratuita.`;
+                planStatusSpan.innerHTML = `✅ Plan activo: 30 días de prueba gratuita`;
             }
         } catch (err) {
             console.error(err);
-            planStatusSpan.innerHTML = "Error al verificar plan. Contacta soporte.";
+            planStatusSpan.innerHTML = "Error al verificar plan";
             planActivo = false;
         }
-        // Habilitar o deshabilitar botones según plan
+        // Habilitar/deshabilitar botones
         const btns = document.querySelectorAll('#appFunctions button, #appFunctions .file-input-label');
         btns.forEach(btn => {
             if (planActivo) btn.classList.remove('disabled-btn');
@@ -224,7 +251,6 @@
         });
     }
 
-    // --- Autenticación ---
     function mostrarUIUsuario(user) {
         if (user) {
             authFormsDiv.style.display = 'none';
@@ -244,11 +270,13 @@
     auth.onAuthStateChanged(async (user) => {
         mostrarUIUsuario(user);
         if (user) {
-            // Escuchar cambios en Firestore (opcional)
             db.collection('users').doc(user.uid).onSnapshot(() => actualizarEstadoPlan(user));
         }
     });
 
+    // ============================================================
+    // AUTENTICACIÓN
+    // ============================================================
     document.getElementById('registerBtn').onclick = async () => {
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
@@ -257,8 +285,7 @@
             return;
         }
         try {
-            const userCred = await auth.createUserWithEmailAndPassword(email, password);
-            // El documento se creará en actualizarEstadoPlan automáticamente
+            await auth.createUserWithEmailAndPassword(email, password);
             authMessage.innerText = "Registro exitoso! Disfruta 30 días gratis.";
         } catch (err) {
             authMessage.innerText = "Error: " + err.message;
@@ -285,12 +312,9 @@
         authMessage.innerText = "Sesión cerrada.";
     };
 
-    // ----- EL RESTO DE FUNCIONES DEL ESCÁNER (sin cambios, solo protegidas por planActivo) -----
-    // (Se mantiene el código anterior, pero cada acción verificará planActivo)
-    // Para evitar duplicar, copiamos las funciones con un if(!planActivo){ alert(...); return; }
-    // Añadimos esa verificación al inicio de cada evento.
-
-    // Variables de imágenes
+    // ============================================================
+    // ESCANNER - IMAGEN A PDF
+    // ============================================================
     let currentImageFile = null;
     let currentImagePreviewUrl = null;
 
@@ -300,8 +324,8 @@
         currentImageFile = file;
         if (currentImagePreviewUrl) URL.revokeObjectURL(currentImagePreviewUrl);
         currentImagePreviewUrl = URL.createObjectURL(file);
-        const previewArea = document.getElementById('imagePreviewArea');
-        previewArea.innerHTML = `<img src="${currentImagePreviewUrl}" style="max-width:100%; max-height:180px;"><br>✅ Imagen lista: ${file.name}`;
+        document.getElementById('imagePreviewArea').innerHTML = 
+            `<img src="${currentImagePreviewUrl}" style="max-width:100%; max-height:180px; border-radius:12px;"><br>✅ ${file.name}`;
         document.getElementById('imgStatus').innerText = `Imagen cargada: ${file.name}`;
     }
 
@@ -316,34 +340,42 @@
         if (!planActivo) { alert("Plan expirado."); return; }
         if (!currentImageFile) { alert("Selecciona una imagen."); return; }
         const statusDiv = document.getElementById('imgStatus');
-        statusDiv.innerText = "Convirtiendo...";
+        statusDiv.innerHTML = '<span class="spinner"></span> Convirtiendo...';
         try {
             const img = new Image();
             img.src = currentImagePreviewUrl;
             await new Promise(r => img.onload = r);
             const { jsPDF } = window.jspdf;
-            let pdf = new jsPDF({ orientation: img.width > img.height ? 'landscape' : 'portrait', unit: 'mm' });
+            let pdf = new jsPDF({ 
+                orientation: img.width > img.height ? 'landscape' : 'portrait', 
+                unit: 'mm' 
+            });
             let imgWidth = pdf.internal.pageSize.getWidth();
             let imgHeight = (img.height * imgWidth) / img.width;
             pdf.addImage(currentImagePreviewUrl, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
             pdf.save(`scan_${Date.now()}.pdf`);
-            statusDiv.innerText = "PDF descargado.";
-        } catch (err) { statusDiv.innerText = "Error: " + err.message; }
+            statusDiv.innerText = "✅ PDF descargado.";
+        } catch (err) { 
+            statusDiv.innerText = "Error: " + err.message; 
+        }
     });
 
-    // Unir PDFs
+    // ============================================================
+    // UNIR PDFs
+    // ============================================================
     let selectedPdfFiles = [];
-    const unionInput = document.getElementById('unionPdfInput');
-    const mergeListArea = document.getElementById('mergeListArea');
-    unionInput.addEventListener('change', (e) => {
+    document.getElementById('unionPdfInput').addEventListener('change', (e) => {
         selectedPdfFiles = Array.from(e.target.files);
-        mergeListArea.innerText = selectedPdfFiles.length ? `✅ ${selectedPdfFiles.length} PDFs seleccionados` : "Ninguno";
+        document.getElementById('mergeListArea').innerText = selectedPdfFiles.length 
+            ? `✅ ${selectedPdfFiles.length} PDFs seleccionados` 
+            : "Ninguno";
     });
+
     document.getElementById('mergeBtn').addEventListener('click', async () => {
         if (!planActivo) { alert("Plan expirado."); return; }
         if (selectedPdfFiles.length < 2) { alert("Selecciona al menos 2 PDFs."); return; }
         const status = document.getElementById('mergeStatus');
-        status.innerText = "Uniendo...";
+        status.innerHTML = '<span class="spinner"></span> Uniendo...';
         try {
             const { PDFDocument } = PDFLib;
             const merged = await PDFDocument.create();
@@ -355,72 +387,116 @@
             }
             const pdfBytes = await merged.save();
             saveAs(new Blob([pdfBytes], {type:'application/pdf'}), `union_${Date.now()}.pdf`);
-            status.innerText = "Unión completada.";
-        } catch(err) { status.innerText = "Error: " + err.message; }
+            status.innerText = "✅ Unión completada.";
+        } catch(err) { 
+            status.innerText = "Error: " + err.message; 
+        }
     });
 
-    // Dividir
+    // ============================================================
+    // DIVIDIR PDF
+    // ============================================================
     let splitPdfBuffer = null;
     document.getElementById('splitPdfInput').addEventListener('change', async (e) => {
         if (!planActivo) { alert("Plan expirado."); return; }
         const file = e.target.files[0];
-        if (file) splitPdfBuffer = await file.arrayBuffer();
-        document.getElementById('splitStatus').innerHTML = `✅ PDF cargado`;
+        if (file) {
+            splitPdfBuffer = await file.arrayBuffer();
+            document.getElementById('splitStatus').innerHTML = `✅ PDF cargado: ${file.name}`;
+        }
     });
+
     document.getElementById('splitDoBtn').addEventListener('click', async () => {
         if (!planActivo) { alert("Plan expirado."); return; }
         if (!splitPdfBuffer) { alert("Carga un PDF."); return; }
         let start = parseInt(document.getElementById('pagInicio').value);
         let end = parseInt(document.getElementById('pagFin').value);
-        if (isNaN(start) || isNaN(end) || start<1 || end<start) { alert("Rango inválido"); return; }
+        if (isNaN(start) || isNaN(end) || start < 1 || end < start) { 
+            alert("Rango inválido"); 
+            return; 
+        }
         const status = document.getElementById('splitStatus');
-        status.innerText = "Dividiendo...";
+        status.innerHTML = '<span class="spinner"></span> Dividiendo...';
         try {
             const { PDFDocument } = PDFLib;
             const src = await PDFDocument.load(splitPdfBuffer);
             const total = src.getPageCount();
             if (end > total) { alert(`Solo ${total} págs`); return; }
             const newDoc = await PDFDocument.create();
-            const indices = Array.from({length: end-start+1}, (_,i)=>start-1+i);
+            const indices = Array.from({length: end - start + 1}, (_, i) => start - 1 + i);
             const pages = await newDoc.copyPages(src, indices);
             pages.forEach(p => newDoc.addPage(p));
             const bytes = await newDoc.save();
             saveAs(new Blob([bytes], {type:'application/pdf'}), `paginas_${start}_a_${end}.pdf`);
-            status.innerText = "Listo.";
-        } catch(err) { status.innerText = "Error: " + err.message; }
+            status.innerText = "✅ Listo.";
+        } catch(err) { 
+            status.innerText = "Error: " + err.message; 
+        }
     });
 
-    // Comprimir
+    // ============================================================
+    // COMPRIMIR PDF - COMPRESIÓN REAL CON PDF.JS
+    // ============================================================
     let compressPdfBuffer = null;
     document.getElementById('compressPdfInput').addEventListener('change', async (e) => {
         if (!planActivo) { alert("Plan expirado."); return; }
         const file = e.target.files[0];
-        if (file) compressPdfBuffer = await file.arrayBuffer();
-        document.getElementById('compressStatus').innerHTML = `📁 PDF cargado`;
+        if (file) {
+            compressPdfBuffer = await file.arrayBuffer();
+            document.getElementById('compressStatus').innerHTML = `📁 PDF cargado: ${file.name}`;
+        }
     });
+
     document.getElementById('compressBtn').addEventListener('click', async () => {
         if (!planActivo) { alert("Plan expirado."); return; }
         if (!compressPdfBuffer) { alert("Carga un PDF."); return; }
+        
         const status = document.getElementById('compressStatus');
-        status.innerText = "Comprimiendo...";
+        status.innerHTML = '<span class="spinner"></span> Comprimiendo imágenes...';
+        
         try {
-            const { PDFDocument } = PDFLib;
-            const original = await PDFDocument.load(compressPdfBuffer);
-            const newDoc = await PDFDocument.create();
-            const pages = original.getPages();
-            for (let page of pages) {
-                const [copiedPage] = await newDoc.copyPages(original, [original.getPageIndices().indexOf(page)]);
-                copiedPage.scaleContent(0.7, 0.7);
-                const { width, height } = copiedPage.getSize();
-                copiedPage.setSize(width * 0.7, height * 0.7);
-                newDoc.addPage(copiedPage);
+            const pdf = await pdfjsLib.getDocument({ data: compressPdfBuffer }).promise;
+            const { jsPDF } = window.jspdf;
+            const newPdf = new jsPDF();
+            
+            const CALIDAD_JPEG = 0.3;  // 0.1 = muy comprimido, 1.0 = sin pérdida
+            const ESCALA = 1.5;        // Menor = más liviano
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                status.innerHTML = `<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`;
+                
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: ESCALA });
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                
+                const imgData = canvas.toDataURL('image/jpeg', CALIDAD_JPEG);
+                
+                const imgWidth = newPdf.internal.pageSize.getWidth();
+                const imgHeight = (viewport.height * imgWidth) / viewport.width;
+                
+                if (i > 1) newPdf.addPage();
+                newPdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
             }
-            const bytes = await newDoc.save();
-            const origKB = compressPdfBuffer.byteLength/1024;
-            const newKB = bytes.byteLength/1024;
-            saveAs(new Blob([bytes], {type:'application/pdf'}), `comprimido_${Date.now()}.pdf`);
-            status.innerText = `Comprimido: ${origKB.toFixed(0)}KB → ${newKB.toFixed(0)}KB (${((1-newKB/origKB)*100).toFixed(0)}% reducción)`;
-        } catch(err) { status.innerText = "Error: " + err.message; }
+            
+            const origKB = compressPdfBuffer.byteLength / 1024;
+            const output = newPdf.output('arraybuffer');
+            const newKB = output.byteLength / 1024;
+            
+            saveAs(new Blob([output], { type: 'application/pdf' }), `comprimido_${Date.now()}.pdf`);
+            
+            status.innerHTML = `✅ ${origKB.toFixed(0)}KB → ${newKB.toFixed(0)}KB 
+                <span style="color:#2c7a4d; font-weight:bold;">(${((1 - newKB/origKB) * 100).toFixed(0)}% reducción)</span>`;
+            
+        } catch(err) { 
+            status.innerText = "Error: " + err.message; 
+            console.error(err);
+        }
     });
 </script>
 </body>
