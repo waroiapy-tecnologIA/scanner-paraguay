@@ -11,6 +11,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <!-- OpenCV.js se cargará bajo demanda -->
     <style>
         * { box-sizing: border-box; }
         body { font-family: system-ui, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; margin: 0; padding: 16px; padding-bottom: 80px; }
@@ -94,7 +95,6 @@
             height: auto;
             display: block;
             background: #000;
-            /* No aplicamos transformación de espejo para que la vista previa sea natural */
         }
         #cameraOverlay {
             position: absolute;
@@ -140,6 +140,10 @@
             top: 20px;
             left: 20px;
             z-index: 10001;
+        }
+        .auto-detect-btn {
+            background: #3b82f6;
+            color: white;
         }
     </style>
 </head>
@@ -307,9 +311,10 @@
 <!-- MODAL CORRECCIÓN DE PERSPECTIVA -->
 <div id="perspModal">
     <h3>📐 Corrección de perspectiva</h3>
-    <p>Arrastra los 4 puntos naranjas a las esquinas del documento</p>
+    <p>Arrastra los puntos o usa <strong>auto enderezar</strong></p>
     <canvas id="perspCanvas"></canvas>
     <div class="persp-btns">
+        <button id="perspAutoBtn" class="auto-detect-btn">🤖 Auto enderezar</button>
         <button id="perspOkBtn">✅ Aplicar y continuar</button>
         <button id="perspSkipBtn" class="btn-secondary">⏭️ Sin corrección</button>
         <button id="perspCancelBtn" style="background:#dc2626;">✖ Cancelar todo</button>
@@ -371,12 +376,125 @@
 
     let currentUser = null, isAdmin = false, userData = null;
 
-    // ==================== CORRECCIÓN DE PERSPECTIVA ====================
+    // ==================== CORRECCIÓN DE PERSPECTIVA (MANUAL + AUTO) ====================
     const perspModal = document.getElementById('perspModal');
     const perspCanvas = document.getElementById('perspCanvas');
     const ctx = perspCanvas.getContext('2d');
     let perspImage = null, perspScale = 1, perspPoints = [];
     let draggingIdx = -1, perspResolve = null;
+
+    // Carga dinámica de OpenCV
+    let opencvLoaded = false;
+    let opencvLoading = false;
+    function loadOpenCV() {
+        return new Promise((resolve, reject) => {
+            if (window.cv && window.cv.Mat) {
+                opencvLoaded = true;
+                resolve();
+                return;
+            }
+            if (opencvLoading) {
+                const checkInterval = setInterval(() => {
+                    if (opencvLoaded) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+                return;
+            }
+            opencvLoading = true;
+            const script = document.createElement('script');
+            script.src = 'https://docs.opencv.org/4.8.0/opencv.js';
+            script.onload = () => {
+                // Esperar a que cv esté listo
+                const check = setInterval(() => {
+                    if (window.cv && window.cv.Mat) {
+                        clearInterval(check);
+                        opencvLoaded = true;
+                        resolve();
+                    }
+                }, 100);
+            };
+            script.onerror = () => {
+                opencvLoading = false;
+                reject(new Error('No se pudo cargar OpenCV.js'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    async function autoDetectarEsquinas() {
+        if (!perspImage) return false;
+        try {
+            await loadOpenCV();
+            const imgElement = perspImage;
+            const src = cv.imread(imgElement);
+            const gray = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+            const blurred = new cv.Mat();
+            cv.GaussianBlur(gray, blurred, { width: 5, height: 5 }, 0);
+            const edges = new cv.Mat();
+            cv.Canny(blurred, edges, 75, 200);
+            
+            const contours = new cv.MatVector();
+            const hierarchy = new cv.Mat();
+            cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            
+            let maxArea = 0;
+            let docContour = null;
+            for (let i = 0; i < contours.size(); i++) {
+                const cnt = contours.get(i);
+                const area = cv.contourArea(cnt);
+                const peri = cv.arcLength(cnt, true);
+                const approx = new cv.Mat();
+                cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+                if (approx.rows === 4 && area > maxArea) {
+                    maxArea = area;
+                    if (docContour) docContour.delete();
+                    docContour = approx.clone();
+                }
+                approx.delete();
+            }
+            
+            if (docContour) {
+                // Obtener los 4 puntos en orden: superior-izquierdo, superior-derecho, inferior-derecho, inferior-izquierdo
+                let pts = [];
+                for (let i = 0; i < 4; i++) {
+                    const x = docContour.data32S[i*2];
+                    const y = docContour.data32S[i*2+1];
+                    pts.push({ x, y });
+                }
+                // Ordenar puntos: calcular centro y ordenar por ángulo
+                const center = { x: pts.reduce((s,p)=>s+p.x,0)/4, y: pts.reduce((s,p)=>s+p.y,0)/4 };
+                pts.sort((a,b) => {
+                    const angleA = Math.atan2(a.y - center.y, a.x - center.x);
+                    const angleB = Math.atan2(b.y - center.y, b.x - center.x);
+                    return angleA - angleB;
+                });
+                // Reordenar para que el primer punto sea el superior-izquierdo (menor x+y aproximado)
+                const tl = pts.reduce((best, p) => (p.x + p.y < best.x + best.y ? p : best), pts[0]);
+                const idxTL = pts.indexOf(tl);
+                const ordered = [];
+                for (let i = 0; i < 4; i++) ordered.push(pts[(idxTL + i) % 4]);
+                // Escalar a coordenadas del canvas (perspScale)
+                const scaled = ordered.map(p => ({ x: p.x * perspScale, y: p.y * perspScale }));
+                // Actualizar perspPoints
+                perspPoints = scaled;
+                dibujarPerspCanvas();
+                docContour.delete();
+                src.delete(); gray.delete(); blurred.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+                return true;
+            } else {
+                src.delete(); gray.delete(); blurred.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+                alert('No se pudo detectar automáticamente el documento. Ajusta manualmente los puntos.');
+                return false;
+            }
+        } catch (err) {
+            console.error('Error en auto detección:', err);
+            alert('Error en la detección automática: ' + err.message);
+            return false;
+        }
+    }
 
     function abrirPerspectiva(imgElement) {
         return new Promise((resolve) => {
@@ -538,6 +656,14 @@
         return outCanvas.toDataURL('image/jpeg', 0.92);
     }
 
+    document.getElementById('perspAutoBtn').onclick = async () => {
+        const boton = document.getElementById('perspAutoBtn');
+        boton.disabled = true;
+        boton.innerHTML = '<span class="spinner"></span> Detectando...';
+        await autoDetectarEsquinas();
+        boton.disabled = false;
+        boton.innerHTML = '🤖 Auto enderezar';
+    };
     document.getElementById('perspOkBtn').onclick = () => {
         const corregida = aplicarPerspectiva();
         cerrarPerspectiva(corregida);
@@ -552,7 +678,7 @@
         cerrarPerspectiva(null, true);
     };
 
-    // ==================== FUNCIONES PDF ====================
+    // ==================== FUNCIONES PDF (sin cambios) ====================
     function agregarMarcaAgua(pdf) {
         const total = pdf.internal.getNumberOfPages();
         for (let i = 1; i <= total; i++) {
@@ -652,7 +778,7 @@
         } catch(err) { statusEl.innerText = "Error: " + err.message; console.error(err); }
     }
 
-    // ==================== COLA DE IMÁGENES ====================
+    // ==================== COLA DE IMÁGENES (sin cambios) ====================
     function agregarImagen(file, queue, previewContainerId) {
         if (!file.type.startsWith('image/')) {
             alert('Solo se permiten imágenes');
@@ -665,11 +791,15 @@
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
+            if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                URL.revokeObjectURL(url);
+                alert('La imagen no se pudo cargar correctamente');
+                return;
+            }
             queue.push({ dataUrl: url, name: file.name || 'captura', element: img });
             renderizarCola(queue, previewContainerId);
         };
         img.onerror = () => {
-            console.error('Error al cargar la imagen');
             URL.revokeObjectURL(url);
             alert('Error al procesar la imagen');
         };
@@ -750,7 +880,6 @@
                 statusEl.innerText = '❌ Conversión cancelada';
                 return;
             }
-            // Asegurar que la imagen se carga correctamente
             const img = new Image();
             await new Promise((resolve, reject) => {
                 img.onload = resolve;
@@ -775,7 +904,7 @@
         renderizarCola(queue, previewContainerId);
     }
 
-    // ==================== CÁMARA INTERNA (CORREGIDA: SIN ESPEJO Y CON MARCO) ====================
+    // ==================== CÁMARA INTERNA (sin cambios) ====================
     async function iniciarCamara(queue, previewContainerId, statusId) {
         currentQueueTarget = queue;
         currentPreviewContainerId = previewContainerId;
@@ -794,16 +923,14 @@
             video.srcObject = stream;
             await video.play();
             loadingDiv.style.display = 'none';
-            // Esperar a que el video tenga dimensiones
             await new Promise(resolve => {
-                const checkInterval = setInterval(() => {
-                    if (video.videoWidth > 0 && video.videoHeight > 0) {
-                        clearInterval(checkInterval);
+                const check = setInterval(() => {
+                    if (video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2) {
+                        clearInterval(check);
                         resolve();
                     }
                 }, 100);
             });
-            // Iniciar dibujo del marco
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             function drawFrame() {
                 if (!video.videoWidth || video.videoWidth === 0) {
@@ -817,7 +944,6 @@
                 overlay.height = rect.height;
                 const ctxOverlay = overlay.getContext('2d');
                 ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
-                // Marco de guía (tipo hoja)
                 const marginX = overlay.width * 0.1;
                 const marginY = overlay.height * 0.15;
                 const frameW = overlay.width - marginX * 2;
@@ -830,7 +956,6 @@
                 ctxOverlay.strokeStyle = '#4caf50';
                 ctxOverlay.lineWidth = 2;
                 ctxOverlay.strokeRect(marginX, marginY, frameW, frameH);
-                // Esquinas
                 const cornerLen = 20;
                 ctxOverlay.beginPath();
                 ctxOverlay.moveTo(marginX, marginY + cornerLen);
@@ -857,25 +982,37 @@
 
     function capturarFoto() {
         const video = document.getElementById('cameraVideo');
-        // Verificar que el video tenga dimensiones válidas
-        if (!video.videoWidth || video.videoWidth === 0) {
+        if (!video.videoWidth || video.videoWidth === 0 || video.readyState < 2) {
             alert('La cámara aún no está lista, espera un momento');
             return;
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        // Dibujar la imagen del video sin ninguna transformación de espejo
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => {
-            if (blob) {
-                const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                agregarImagen(file, currentQueueTarget, currentPreviewContainerId);
-            } else {
-                alert('Error al capturar la foto');
+        const doCapture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const centerX = Math.floor(canvas.width / 2);
+            const centerY = Math.floor(canvas.height / 2);
+            const pixel = ctx.getImageData(centerX, centerY, 1, 1).data;
+            if (pixel[0] === 0 && pixel[1] === 0 && pixel[2] === 0) {
+                requestAnimationFrame(() => doCapture());
+                return;
             }
-        }, 'image/jpeg', 0.92);
+            canvas.toBlob(blob => {
+                if (blob) {
+                    const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    agregarImagen(file, currentQueueTarget, currentPreviewContainerId);
+                } else {
+                    alert('Error al capturar la foto');
+                }
+            }, 'image/jpeg', 0.92);
+        };
+        if ('requestVideoFrameCallback' in video) {
+            video.requestVideoFrameCallback(() => doCapture());
+        } else {
+            requestAnimationFrame(() => doCapture());
+        }
     }
 
     function cerrarCamara() {
@@ -897,7 +1034,7 @@
         ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
     }
 
-    // ==================== AUTENTICACIÓN ====================
+    // ==================== AUTENTICACIÓN (sin cambios) ====================
     function mostrarPantalla(tipo) {
         authFormsDiv.style.display = 'none';
         userInfoDiv.style.display = 'none';
@@ -1147,7 +1284,7 @@
         });
     }
 
-    console.log("✅ App cargada. Recuerda configurar reglas de Firestore para seguridad.");
+    console.log("✅ App cargada con auto enderezado por OpenCV.");
 </script>
 </body>
 </html>
