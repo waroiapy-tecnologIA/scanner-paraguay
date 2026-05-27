@@ -627,18 +627,32 @@
         const pts = perspPoints.map(p => ({ x: p.x / perspScale, y: p.y / perspScale }));
         const ancho = Math.round(Math.max(distancia(pts[0], pts[1]), distancia(pts[2], pts[3])));
         const alto = Math.round(Math.max(distancia(pts[0], pts[3]), distancia(pts[1], pts[2])));
+        console.log('[PERSP] ancho:', ancho, 'alto:', alto);
+        console.log('[PERSP] perspImage.src tipo:', perspImage.src.substring(0, 30));
+        console.log('[PERSP] perspImage.naturalWidth:', perspImage.naturalWidth, 'naturalHeight:', perspImage.naturalHeight);
         const src = pts;
         const dst = [{ x: 0, y: 0 }, { x: ancho, y: 0 }, { x: ancho, y: alto }, { x: 0, y: alto }];
         const outCanvas = document.createElement('canvas');
         outCanvas.width = ancho; outCanvas.height = alto;
-        // Fix: willReadFrequently evita canvas negro al leer/escribir pixels en móvil
         const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
         const tmpCanvas = document.createElement('canvas');
         tmpCanvas.width = perspImage.naturalWidth; tmpCanvas.height = perspImage.naturalHeight;
-        // Fix: willReadFrequently en canvas temporal también
         const tmpCtx = tmpCanvas.getContext('2d', { willReadFrequently: true });
+        tmpCtx.fillStyle = '#ffffff';
+        tmpCtx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
         tmpCtx.drawImage(perspImage, 0, 0);
-        const srcData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
+        let srcData;
+        try {
+            srcData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
+            console.log('[PERSP] getImageData OK, pixels:', srcData.data.length);
+            // Verificar si los primeros pixels son todos 0 (canvas tainted o negro)
+            const sample = srcData.data.slice(0, 20);
+            console.log('[PERSP] primeros pixels:', Array.from(sample));
+        } catch(e) {
+            console.error('[PERSP] getImageData FALLÓ (canvas tainted):', e.message);
+            alert('Error de seguridad al leer la imagen. Intenta desde galería.');
+            return perspImage.src;
+        }
         const outData = outCtx.createImageData(ancho, alto);
         const H = calcularHomografia(dst, src);
         for (let y = 0; y < alto; y++) {
@@ -651,19 +665,24 @@
                     outData.data[di]   = srcData.data[si];
                     outData.data[di+1] = srcData.data[si+1];
                     outData.data[di+2] = srcData.data[si+2];
-                    outData.data[di+3] = 255; // Fix: forzar alpha 255 para evitar transparencia negra en JPEG
+                    outData.data[di+3] = 255;
+                } else {
+                    const di = (y * ancho + x) * 4;
+                    outData.data[di] = 255; outData.data[di+1] = 255;
+                    outData.data[di+2] = 255; outData.data[di+3] = 255;
                 }
             }
         }
         outCtx.putImageData(outData, 0, 0);
-        // Fix: exportar como JPEG sobre fondo blanco para evitar negro en Safari/iOS
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = ancho; finalCanvas.height = alto;
         const finalCtx = finalCanvas.getContext('2d');
         finalCtx.fillStyle = '#ffffff';
         finalCtx.fillRect(0, 0, ancho, alto);
         finalCtx.drawImage(outCanvas, 0, 0);
-        return finalCanvas.toDataURL('image/jpeg', 0.92);
+        const result = finalCanvas.toDataURL('image/jpeg', 0.92);
+        console.log('[PERSP] resultado dataUrl tipo:', result.substring(0, 30), 'largo:', result.length);
+        return result;
     }
 
     document.getElementById('perspAutoBtn').onclick = async () => {
@@ -802,24 +821,22 @@
             alert('La imagen no puede superar los 10 MB');
             return;
         }
-        // Convertir a base64 para evitar canvas tainted en móvil/Safari
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const dataUrl = e.target.result;
-            const img = new Image();
-            img.onload = () => {
-                if (img.naturalWidth === 0 || img.naturalHeight === 0) {
-                    alert('La imagen no se pudo cargar correctamente');
-                    return;
-                }
-                queue.push({ dataUrl: dataUrl, name: file.name || 'captura', element: img });
-                renderizarCola(queue, previewContainerId);
-            };
-            img.onerror = () => alert('Error al procesar la imagen');
-            img.src = dataUrl;
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                URL.revokeObjectURL(url);
+                alert('La imagen no se pudo cargar correctamente');
+                return;
+            }
+            queue.push({ dataUrl: url, name: file.name || 'captura', element: img });
+            renderizarCola(queue, previewContainerId);
         };
-        reader.onerror = () => alert('Error al leer la imagen');
-        reader.readAsDataURL(file);
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            alert('Error al procesar la imagen');
+        };
+        img.src = url;
     }
 
     function revocarTodasLasUrls(queue) {
@@ -896,23 +913,26 @@
                 statusEl.innerText = '❌ Conversión cancelada';
                 return;
             }
-            const imgCargada = await new Promise((resolve, reject) => {
-                const im = new Image();
-                im.onload = () => resolve(im);
-                im.onerror = () => reject(new Error('No se pudo cargar la imagen corregida'));
-                im.src = dataUrlCorregida;
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error('No se pudo cargar la imagen corregida'));
+                img.src = dataUrlCorregida;
             });
             if (i > 0) pdf.addPage();
-            const imgWidthPx = imgCargada.naturalWidth;
-            const imgHeightPx = imgCargada.naturalHeight;
+            const imgWidthPx = img.width, imgHeightPx = img.height;
             const ratio = Math.min(PAGE_WIDTH_MM / imgWidthPx, PAGE_HEIGHT_MM / imgHeightPx);
             const drawWidth = imgWidthPx * ratio, drawHeight = imgHeightPx * ratio;
             const x = (PAGE_WIDTH_MM - drawWidth) / 2, y = (PAGE_HEIGHT_MM - drawHeight) / 2;
             pdf.addImage(dataUrlCorregida, 'JPEG', x, y, drawWidth, drawHeight);
+            if (dataUrlCorregida !== imgObj.dataUrl && dataUrlCorregida.startsWith('blob:')) {
+                URL.revokeObjectURL(dataUrlCorregida);
+            }
         }
         agregarMarcaAgua(pdf);
         pdf.save(`scan_${Date.now()}.pdf`);
         statusEl.innerHTML = `✅ PDF de ${total} páginas generado.`;
+        revocarTodasLasUrls(queue);
         queue.length = 0;
         renderizarCola(queue, previewContainerId);
     }
@@ -1003,29 +1023,24 @@
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            // Fix: usar willReadFrequently para mejor rendimiento en móvil
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Usar toDataURL directamente para evitar canvas tainted al hacer getImageData después
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-            if (!dataUrl || dataUrl === 'data:,') {
-                alert('Error al capturar la foto');
-                return;
-            }
-            const nombre = `foto_${Date.now()}.jpg`;
-            const img = new Image();
-            img.onload = () => {
-                if (img.naturalWidth === 0 || img.naturalHeight === 0) {
-                    alert('La imagen capturada no tiene dimensiones válidas');
-                    return;
+            // Fix: eliminada la verificación de pixel negro que causaba bucle infinito
+            // y PDF negro cuando el fondo era oscuro (mesa negra, documento oscuro, etc.)
+            canvas.toBlob(blob => {
+                if (blob) {
+                    const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    agregarImagen(file, currentQueueTarget, currentPreviewContainerId);
+                } else {
+                    alert('Error al capturar la foto');
                 }
-                currentQueueTarget.push({ dataUrl: dataUrl, name: nombre, element: img });
-                renderizarCola(currentQueueTarget, currentPreviewContainerId);
-            };
-            img.src = dataUrl;
+            }, 'image/jpeg', 0.92);
         };
         if ('requestVideoFrameCallback' in video) {
             video.requestVideoFrameCallback(() => doCapture());
         } else {
+            // Fix: pequeño delay para asegurar que el frame esté listo en todos los navegadores
             setTimeout(() => doCapture(), 150);
         }
     }
