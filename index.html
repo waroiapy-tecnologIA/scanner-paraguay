@@ -802,7 +802,7 @@
             alert('La imagen no puede superar los 10 MB');
             return;
         }
-        // Convertir a base64 para evitar canvas tainted en móvil/Safari al hacer getImageData
+        // Convertir a base64 para evitar canvas tainted en móvil/Safari
         const reader = new FileReader();
         reader.onload = (e) => {
             const dataUrl = e.target.result;
@@ -823,7 +823,6 @@
     }
 
     function revocarTodasLasUrls(queue) {
-        // Solo revocar blob URLs, no data URLs (base64)
         for (let item of queue) {
             if (item.dataUrl && item.dataUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(item.dataUrl);
@@ -897,7 +896,6 @@
                 statusEl.innerText = '❌ Conversión cancelada';
                 return;
             }
-            // Cargar imagen corregida para obtener dimensiones reales
             const imgCargada = await new Promise((resolve, reject) => {
                 const im = new Image();
                 im.onload = () => resolve(im);
@@ -1005,24 +1003,29 @@
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            // Fix: usar willReadFrequently para mejor rendimiento en móvil
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Fix: eliminada la verificación de pixel negro que causaba bucle infinito
-            // y PDF negro cuando el fondo era oscuro (mesa negra, documento oscuro, etc.)
-            canvas.toBlob(blob => {
-                if (blob) {
-                    const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                    agregarImagen(file, currentQueueTarget, currentPreviewContainerId);
-                } else {
-                    alert('Error al capturar la foto');
+            // Usar toDataURL directamente para evitar canvas tainted al hacer getImageData después
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            if (!dataUrl || dataUrl === 'data:,') {
+                alert('Error al capturar la foto');
+                return;
+            }
+            const nombre = `foto_${Date.now()}.jpg`;
+            const img = new Image();
+            img.onload = () => {
+                if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                    alert('La imagen capturada no tiene dimensiones válidas');
+                    return;
                 }
-            }, 'image/jpeg', 0.92);
+                currentQueueTarget.push({ dataUrl: dataUrl, name: nombre, element: img });
+                renderizarCola(currentQueueTarget, currentPreviewContainerId);
+            };
+            img.src = dataUrl;
         };
         if ('requestVideoFrameCallback' in video) {
             video.requestVideoFrameCallback(() => doCapture());
         } else {
-            // Fix: pequeño delay para asegurar que el frame esté listo en todos los navegadores
             setTimeout(() => doCapture(), 150);
         }
     }
