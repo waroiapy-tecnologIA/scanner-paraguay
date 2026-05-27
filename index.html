@@ -901,7 +901,7 @@
                 img.src = dataUrlCorregida;
             });
             if (i > 0) pdf.addPage();
-            const imgWidthPx = img.width, imgHeightPx = img.height;
+            const imgWidthPx = img.naturalWidth || img.width, imgHeightPx = img.naturalHeight || img.height;
             const ratio = Math.min(PAGE_WIDTH_MM / imgWidthPx, PAGE_HEIGHT_MM / imgHeightPx);
             const drawWidth = imgWidthPx * ratio, drawHeight = imgHeightPx * ratio;
             const x = (PAGE_WIDTH_MM - drawWidth) / 2, y = (PAGE_HEIGHT_MM - drawHeight) / 2;
