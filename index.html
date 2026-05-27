@@ -379,7 +379,8 @@
     // ==================== CORRECCIÓN DE PERSPECTIVA (MANUAL + AUTO) ====================
     const perspModal = document.getElementById('perspModal');
     const perspCanvas = document.getElementById('perspCanvas');
-    const ctx = perspCanvas.getContext('2d');
+    // Fix: willReadFrequently mejora rendimiento en móvil y evita canvas negro en iOS/Safari
+    const ctx = perspCanvas.getContext('2d', { willReadFrequently: true });
     let perspImage = null, perspScale = 1, perspPoints = [];
     let draggingIdx = -1, perspResolve = null;
 
@@ -630,10 +631,12 @@
         const dst = [{ x: 0, y: 0 }, { x: ancho, y: 0 }, { x: ancho, y: alto }, { x: 0, y: alto }];
         const outCanvas = document.createElement('canvas');
         outCanvas.width = ancho; outCanvas.height = alto;
-        const outCtx = outCanvas.getContext('2d');
+        // Fix: willReadFrequently evita canvas negro al leer/escribir pixels en móvil
+        const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
         const tmpCanvas = document.createElement('canvas');
         tmpCanvas.width = perspImage.naturalWidth; tmpCanvas.height = perspImage.naturalHeight;
-        const tmpCtx = tmpCanvas.getContext('2d');
+        // Fix: willReadFrequently en canvas temporal también
+        const tmpCtx = tmpCanvas.getContext('2d', { willReadFrequently: true });
         tmpCtx.drawImage(perspImage, 0, 0);
         const srcData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
         const outData = outCtx.createImageData(ancho, alto);
@@ -648,12 +651,19 @@
                     outData.data[di]   = srcData.data[si];
                     outData.data[di+1] = srcData.data[si+1];
                     outData.data[di+2] = srcData.data[si+2];
-                    outData.data[di+3] = srcData.data[si+3];
+                    outData.data[di+3] = 255; // Fix: forzar alpha 255 para evitar transparencia negra en JPEG
                 }
             }
         }
         outCtx.putImageData(outData, 0, 0);
-        return outCanvas.toDataURL('image/jpeg', 0.92);
+        // Fix: exportar como JPEG sobre fondo blanco para evitar negro en Safari/iOS
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = ancho; finalCanvas.height = alto;
+        const finalCtx = finalCanvas.getContext('2d');
+        finalCtx.fillStyle = '#ffffff';
+        finalCtx.fillRect(0, 0, ancho, alto);
+        finalCtx.drawImage(outCanvas, 0, 0);
+        return finalCanvas.toDataURL('image/jpeg', 0.92);
     }
 
     document.getElementById('perspAutoBtn').onclick = async () => {
@@ -669,9 +679,13 @@
         cerrarPerspectiva(corregida);
     };
     document.getElementById('perspSkipBtn').onclick = () => {
+        // Fix: usar fondo blanco para evitar transparencia negra en JPEG
         const canvas = document.createElement('canvas');
         canvas.width = perspImage.naturalWidth; canvas.height = perspImage.naturalHeight;
-        canvas.getContext('2d').drawImage(perspImage, 0, 0);
+        const skCtx = canvas.getContext('2d');
+        skCtx.fillStyle = '#ffffff';
+        skCtx.fillRect(0, 0, canvas.width, canvas.height);
+        skCtx.drawImage(perspImage, 0, 0);
         cerrarPerspectiva(canvas.toDataURL('image/jpeg', 0.92));
     };
     document.getElementById('perspCancelBtn').onclick = () => {
@@ -990,15 +1004,11 @@
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
+            // Fix: usar willReadFrequently para mejor rendimiento en móvil
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const centerX = Math.floor(canvas.width / 2);
-            const centerY = Math.floor(canvas.height / 2);
-            const pixel = ctx.getImageData(centerX, centerY, 1, 1).data;
-            if (pixel[0] === 0 && pixel[1] === 0 && pixel[2] === 0) {
-                requestAnimationFrame(() => doCapture());
-                return;
-            }
+            // Fix: eliminada la verificación de pixel negro que causaba bucle infinito
+            // y PDF negro cuando el fondo era oscuro (mesa negra, documento oscuro, etc.)
             canvas.toBlob(blob => {
                 if (blob) {
                     const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
@@ -1011,7 +1021,8 @@
         if ('requestVideoFrameCallback' in video) {
             video.requestVideoFrameCallback(() => doCapture());
         } else {
-            requestAnimationFrame(() => doCapture());
+            // Fix: pequeño delay para asegurar que el frame esté listo en todos los navegadores
+            setTimeout(() => doCapture(), 150);
         }
     }
 
