@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Scanner PDF Pro - Freemium 30 días</title>
+    <title>Scanner PDF Pro - Admin Panel</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -14,7 +14,7 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: system-ui, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; margin: 0; padding: 16px; padding-bottom: 80px; }
-        .container { max-width: 600px; margin: 0 auto; }
+        .container { max-width: 700px; margin: 0 auto; }
         .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .auth-card { background: #1e3c72; color: white; }
         input, button { border-radius: 40px; border: none; padding: 12px 16px; font-size: 1rem; margin: 5px 0; }
@@ -22,19 +22,21 @@
         button { background: #2c7a4d; color: white; font-weight: bold; cursor: pointer; }
         .btn-secondary { background: #4b5563; }
         .btn-warning { background: #f59e0b; color: #1e3c72; }
+        .btn-danger { background: #dc2626; }
         .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
         .file-input-label { display: inline-block; padding: 12px 16px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; font-size: 1rem; }
         .preview-area { background: #f9fafb; border-radius: 20px; padding: 12px; margin-top: 16px; border: 1px solid #e2e8f0; }
         .status { font-size: 0.85rem; margin-top: 8px; color: #2d3748; }
         .plan-badge { background: #fbbf24; color: #1e3c72; padding: 6px 12px; border-radius: 40px; font-weight: bold; text-align: center; margin-bottom: 12px; }
         h2 { font-size: 1.4rem; margin: 0 0 8px; }
+        h3 { font-size: 1.2rem; margin: 0 0 12px; }
         .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 6px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .pending-card { background: #fef3c7; border: 2px solid #f59e0b; border-radius: 20px; padding: 20px; text-align: center; }
         .admin-badge { display: inline-block; background: #dc2626; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
-        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e2e8f0; }
-        .user-info { flex: 1; }
-        .user-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .user-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 8px; }
+        .user-info { flex: 1; min-width: 150px; }
+        .user-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .aprobado { color: #2c7a4d; font-weight: bold; }
         .pendiente { color: #f59e0b; font-weight: bold; }
         .rechazado { color: #dc2626; font-weight: bold; }
@@ -49,144 +51,39 @@
             align-items: center; justify-content: center;
         }
         #perspModal.activo { display: flex; }
-        #perspModal h3 { color: white; margin: 0 0 8px; font-size: 1rem; text-align: center; }
-        #perspModal p { color: #cbd5e1; font-size: 0.8rem; margin: 0 0 10px; text-align: center; padding: 0 16px; }
         #perspCanvas { touch-action: none; cursor: crosshair; border-radius: 12px; max-width: 95vw; max-height: 65vh; display: block; }
         .persp-btns { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
-        .persp-btns button { padding: 10px 20px; font-size: 0.9rem; }
-        .img-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
-        .queue-item { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .queue-controls { display: flex; gap: 4px; }
-        .queue-controls button { padding: 4px 8px; font-size: 0.7rem; }
 
-        /* MODAL CÁMARA MEJORADO */
+        /* MODAL CÁMARA */
         #cameraModal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 10000; flex-direction: column;
             align-items: center; justify-content: center;
         }
         #cameraModal.activo { display: flex; }
-        .camera-header {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 10001;
-            display: flex;
-            gap: 12px;
-        }
-        .camera-header button {
-            background: rgba(0,0,0,0.6);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-            padding: 8px 16px;
-            border-radius: 40px;
-            font-size: 0.9rem;
-            backdrop-filter: blur(4px);
-        }
-        .flash-btn {
-            background: rgba(0,0,0,0.6);
-        }
-        .flash-btn.active {
-            background: #fbbf24;
-            color: #1e3c72;
-        }
-        .video-container {
-            position: relative;
-            max-width: 95vw;
-            max-height: 70vh;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-        }
-        #cameraVideo {
-            width: 100%;
-            height: auto;
-            display: block;
-            background: #000;
-        }
-        #cameraOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        .capture-btn-container {
-            margin-top: 25px;
-            text-align: center;
-        }
-        .capture-btn {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background-color: #4caf50;
-            border: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            cursor: pointer;
-            transition: transform 0.1s ease, background 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .capture-btn:active {
-            transform: scale(0.92);
-            background-color: #388e3c;
-        }
-        .capture-btn::before {
-            content: "📸";
-            font-size: 2.5rem;
-        }
-        .camera-loading {
-            color: white;
-            text-align: center;
-            margin-bottom: 10px;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 16px;
-            border-radius: 40px;
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 10001;
-        }
-        .preview-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 20000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            pointer-events: none;
-        }
-        .preview-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .preview-img {
-            max-width: 90vw;
-            max-height: 70vh;
-            border-radius: 20px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-        }
-        .preview-text {
-            color: white;
-            margin-top: 20px;
-            font-size: 1.2rem;
-            background: rgba(0,0,0,0.6);
-            padding: 8px 24px;
-            border-radius: 40px;
-        }
-        .auto-detect-btn {
-            background: #3b82f6;
-            color: white;
-        }
+        .camera-header { position: absolute; top: 20px; right: 20px; display: flex; gap: 12px; z-index: 10001; }
+        .camera-header button { background: rgba(0,0,0,0.6); color: white; border: none; padding: 8px 16px; border-radius: 40px; }
+        .video-container { position: relative; max-width: 95vw; max-height: 70vh; border-radius: 20px; overflow: hidden; }
+        #cameraVideo { width: 100%; height: auto; background: #000; }
+        #cameraOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .capture-btn-container { margin-top: 25px; text-align: center; }
+        .capture-btn { width: 80px; height: 80px; border-radius: 50%; background-color: #4caf50; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .capture-btn:active { transform: scale(0.92); }
+        .capture-btn::before { content: "📸"; font-size: 2.5rem; }
+        .camera-loading { color: white; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 40px; position: absolute; top: 20px; left: 20px; }
+        .preview-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20000; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+        .preview-overlay.active { opacity: 1; pointer-events: auto; }
+        .preview-img { max-width: 90vw; max-height: 70vh; border-radius: 20px; }
+        .preview-text { color: white; margin-top: 20px; background: rgba(0,0,0,0.6); padding: 8px 24px; border-radius: 40px; }
+
+        .img-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
+        .queue-item { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .queue-controls { display: flex; gap: 4px; }
+        .admin-tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #ddd; }
+        .admin-tab { padding: 8px 16px; cursor: pointer; border-radius: 20px 20px 0 0; background: #e2e8f0; }
+        .admin-tab.active { background: #1e3c72; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
     </style>
 </head>
 <body>
@@ -197,7 +94,7 @@
         <div style="text-align:center; margin-bottom:12px;">
             <img src="1777768984633.png" alt="WARO I.A." style="max-width:100%; max-height:120px; object-fit:contain;">
         </div>
-        <h2>🔐 Acceso a Scanner PDF Pro</h2>
+        <h2>🔐 Scanner PDF Pro</h2>
         <div id="authForms">
             <input type="email" id="email" placeholder="Correo electrónico">
             <input type="password" id="password" placeholder="Contraseña">
@@ -205,9 +102,7 @@
                 <button id="loginBtn">Iniciar sesión</button>
                 <button id="registerBtn" class="btn-secondary">Registrarse</button>
             </div>
-            <div style="text-align:center;">
-                <button id="forgotBtn" class="forgot-btn">¿Olvidaste tu contraseña?</button>
-            </div>
+            <button id="forgotBtn" class="forgot-btn">¿Olvidaste tu contraseña?</button>
             <div id="authMessage" class="status" style="color:#ffd966;"></div>
         </div>
         <div id="userInfo" style="display:none;">
@@ -217,152 +112,121 @@
         </div>
     </div>
 
-    <!-- PANTALLA PENDIENTE -->
+    <!-- PANTALLA PENDIENTE (usuario no aprobado) -->
     <div id="pendingScreen" style="display:none;">
         <div class="card pending-card">
             <h2>⏳ Cuenta en revisión</h2>
             <p>Tu registro fue recibido. El administrador debe aprobar tu cuenta.</p>
-            <p style="font-size:0.85rem; color:#92400e;">Este proceso puede tomar hasta 24 horas.</p>
             <button id="refreshPendingBtn" class="btn-warning">🔄 Verificar estado</button>
         </div>
     </div>
 
-    <!-- PANEL ADMIN -->
+    <!-- PANEL ADMIN (solo para waroiapy@gmail.com) -->
     <div id="adminPanel" style="display:none;">
         <div class="card" style="background:#1e3c72; color:white;">
-            <div style="text-align:center; margin-bottom:12px;">
-                <img src="1777768984633.png" alt="WARO I.A." style="max-width:100%; max-height:100px; object-fit:contain;">
+            <h2>👑 Panel de Control</h2>
+            <div class="admin-badge">ADMINISTRADOR</div>
+            <p style="margin-top:8px;">Gestiona usuarios, aprueba cuentas, renueva suscripciones.</p>
+            <button id="recargarUsuariosBtn" style="background:#fbbf24; color:#1e3c72;">🔄 Recargar lista</button>
+        </div>
+
+        <div class="card">
+            <div class="admin-tabs">
+                <div class="admin-tab active" data-tab="pendientes">⏳ Pendientes</div>
+                <div class="admin-tab" data-tab="aprobados">✅ Aprobados</div>
+                <div class="admin-tab" data-tab="rechazados">❌ Rechazados</div>
             </div>
-            <h2>👑 Panel de Administrador</h2>
-            <div class="admin-badge">ADMIN</div>
-            <p style="font-size:0.85rem; margin-top:8px;">Gestiona las cuentas pendientes de aprobación</p>
-            <button id="recargarUsuariosBtn" style="background:#fbbf24; color:#1e3c72; margin-top:10px;">🔄 Recargar usuarios</button>
-        </div>
-        <div class="card">
-            <div style="font-weight:bold; margin-bottom:12px;">📋 Usuarios pendientes</div>
-            <div id="pendingUsersList">Cargando...</div>
-        </div>
-        <div class="card">
-            <div style="font-weight:bold; margin-bottom:12px;">✅ Usuarios aprobados</div>
-            <div id="approvedUsersList">Cargando...</div>
-        </div>
-        <div class="card">
-            <div style="font-weight:bold; margin-bottom:12px;">❌ Usuarios rechazados</div>
-            <div id="rejectedUsersList">Cargando...</div>
+            <div id="tabPendientes" class="tab-content active">Cargando...</div>
+            <div id="tabAprobados" class="tab-content">Cargando...</div>
+            <div id="tabRechazados" class="tab-content">Cargando...</div>
         </div>
 
         <!-- HERRAMIENTAS PDF DEL ADMIN -->
         <div class="card" style="border:2px solid #1e3c72;">
-            <h2 style="color:#1e3c72;">🛠️ Mis herramientas PDF</h2>
+            <h3>🛠️ Mis herramientas PDF</h3>
             <div class="tool-section">
-                <div style="font-weight:bold;">📸 Foto / Imagen a PDF (múltiples capturas)</div>
+                <div>📸 Foto / Imagen a PDF</div>
                 <div class="btn-group">
-                    <button id="cameraBtnA" class="file-input-label" style="background:#2c7a4d;">📷 Cámara</button>
-                    <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
-                        <input type="file" id="galleryInputA" accept="image/*" style="display:none;">
-                    </label>
+                    <button id="cameraBtnA" class="file-input-label">📷 Cámara</button>
+                    <label class="file-input-label">🖼️ Galería <input type="file" id="galleryInputA" accept="image/*" style="display:none;"></label>
                 </div>
                 <button id="clearQueueA" class="btn-secondary">🗑️ Vaciar lista</button>
-                <div class="preview-area" id="previewA">🖼️ No hay imágenes</div>
-                <button id="convertBtnA" style="margin-top:10px;">📑 Convertir todas a PDF</button>
-                <div class="status" id="statusImgA"></div>
+                <div id="previewA" class="preview-area">🖼️ No hay imágenes</div>
+                <button id="convertBtnA">📑 Convertir a PDF</button>
+                <div id="statusImgA" class="status"></div>
             </div>
             <div class="tool-section">
-                <div style="font-weight:bold;">🔗 Unir PDFs</div>
-                <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📂 Seleccionar PDFs
-                    <input type="file" id="mergeInputA" accept="application/pdf" multiple style="display:none;">
-                </label>
-                <button id="mergeBtnA">⚡ Unir PDFs</button>
-                <div class="preview-area" id="mergeListA">📄 Lista de PDFs</div>
-                <div class="status" id="statusMergeA"></div>
+                <div>🔗 Unir PDFs</div>
+                <label class="file-input-label">📂 Seleccionar PDFs <input type="file" id="mergeInputA" accept="application/pdf" multiple style="display:none;"></label>
+                <button id="mergeBtnA">⚡ Unir</button>
+                <div id="mergeListA" class="preview-area">📄 Lista de PDFs</div>
+                <div id="statusMergeA" class="status"></div>
             </div>
             <div class="tool-section">
-                <div style="font-weight:bold;">✂️ Dividir PDF</div>
-                <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF
-                    <input type="file" id="splitInputA" accept="application/pdf" style="display:none;">
-                </label>
-                <div style="display:flex; gap:8px; margin:10px 0;">
-                    <input type="number" id="splitStartA" placeholder="Inicio">
-                    <input type="number" id="splitEndA" placeholder="Fin">
-                    <button id="splitBtnA">Extraer</button>
-                </div>
-                <div class="status" id="statusSplitA"></div>
+                <div>✂️ Dividir PDF</div>
+                <label class="file-input-label">📁 Elegir PDF <input type="file" id="splitInputA" accept="application/pdf" style="display:none;"></label>
+                <div style="display:flex; gap:8px;"><input type="number" id="splitStartA" placeholder="Inicio"><input type="number" id="splitEndA" placeholder="Fin"><button id="splitBtnA">Extraer</button></div>
+                <div id="statusSplitA" class="status"></div>
             </div>
             <div class="tool-section">
-                <div style="font-weight:bold;">🗜️ Comprimir PDF</div>
-                <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF
-                    <input type="file" id="compressInputA" accept="application/pdf" style="display:none;">
-                </label>
-                <button id="compressBtnA">🔽 Comprimir PDF</button>
-                <div class="status" id="statusCompressA"></div>
+                <div>🗜️ Comprimir PDF</div>
+                <label class="file-input-label">📁 Elegir PDF <input type="file" id="compressInputA" accept="application/pdf" style="display:none;"></label>
+                <button id="compressBtnA">🔽 Comprimir</button>
+                <div id="statusCompressA" class="status"></div>
             </div>
         </div>
     </div>
 
-    <!-- FUNCIONES USUARIO NORMAL -->
+    <!-- FUNCIONES PARA USUARIO NORMAL -->
     <div id="appFunctions" style="display:none;">
         <div class="card">
-            <div style="font-weight:bold;">📸 Foto / Imagen a PDF (múltiples capturas)</div>
+            <div>📸 Foto / Imagen a PDF</div>
             <div class="btn-group">
-                <button id="cameraBtn" class="file-input-label" style="background:#2c7a4d;">📷 Cámara</button>
-                <label class="file-input-label" style="background:#4b5563;">🖼️ Galería
-                    <input type="file" id="galleryInput" accept="image/*" style="display:none;">
-                </label>
+                <button id="cameraBtn" class="file-input-label">📷 Cámara</button>
+                <label class="file-input-label">🖼️ Galería <input type="file" id="galleryInput" accept="image/*" style="display:none;"></label>
             </div>
             <button id="clearQueue" class="btn-secondary">🗑️ Vaciar lista</button>
-            <div class="preview-area" id="imagePreviewArea">🖼️ No hay imágenes</div>
-            <button id="convertToPdfBtn" style="margin-top:10px;">📑 Convertir todas a PDF</button>
-            <div class="status" id="imgStatus"></div>
+            <div id="imagePreviewArea" class="preview-area">🖼️ No hay imágenes</div>
+            <button id="convertToPdfBtn">📑 Convertir a PDF</button>
+            <div id="imgStatus" class="status"></div>
         </div>
         <div class="card">
-            <div style="font-weight:bold;">🔗 Unir PDFs</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📂 Seleccionar varios PDFs
-                <input type="file" id="unionPdfInput" accept="application/pdf" multiple style="display:none;">
-            </label>
-            <button id="mergeBtn">⚡ Unir PDFs</button>
-            <div class="preview-area" id="mergeListArea">📄 Lista de PDFs seleccionados</div>
-            <div class="status" id="mergeStatus"></div>
+            <div>🔗 Unir PDFs</div>
+            <label class="file-input-label">📂 Seleccionar PDFs <input type="file" id="unionPdfInput" accept="application/pdf" multiple style="display:none;"></label>
+            <button id="mergeBtn">⚡ Unir</button>
+            <div id="mergeListArea" class="preview-area">📄 Lista de PDFs</div>
+            <div id="mergeStatus" class="status"></div>
         </div>
         <div class="card">
-            <div style="font-weight:bold;">✂️ Dividir PDF</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF
-                <input type="file" id="splitPdfInput" accept="application/pdf" style="display:none;">
-            </label>
-            <div style="display:flex; gap:8px; margin:10px 0;">
-                <input type="number" id="pagInicio" placeholder="Inicio">
-                <input type="number" id="pagFin" placeholder="Fin">
-                <button id="splitDoBtn">Extraer</button>
-            </div>
-            <div class="status" id="splitStatus"></div>
+            <div>✂️ Dividir PDF</div>
+            <label class="file-input-label">📁 Elegir PDF <input type="file" id="splitPdfInput" accept="application/pdf" style="display:none;"></label>
+            <div style="display:flex; gap:8px;"><input type="number" id="pagInicio" placeholder="Inicio"><input type="number" id="pagFin" placeholder="Fin"><button id="splitDoBtn">Extraer</button></div>
+            <div id="splitStatus" class="status"></div>
         </div>
         <div class="card">
-            <div style="font-weight:bold;">🗜️ Comprimir PDF</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF
-                <input type="file" id="compressPdfInput" accept="application/pdf" style="display:none;">
-            </label>
-            <button id="compressBtn">🔽 Comprimir PDF</button>
-            <div class="status" id="compressStatus"></div>
+            <div>🗜️ Comprimir PDF</div>
+            <label class="file-input-label">📁 Elegir PDF <input type="file" id="compressPdfInput" accept="application/pdf" style="display:none;"></label>
+            <button id="compressBtn">🔽 Comprimir</button>
+            <div id="compressStatus" class="status"></div>
         </div>
     </div>
 </div>
 
-<!-- MODAL CORRECCIÓN DE PERSPECTIVA (ARREGLADA CON OPENCV) -->
+<!-- MODAL CORRECCIÓN PERSPECTIVA -->
 <div id="perspModal">
     <h3>📐 Corrección de perspectiva</h3>
-    <p>Arrastra los puntos o usa <strong>auto enderezar</strong></p>
     <canvas id="perspCanvas"></canvas>
     <div class="persp-btns">
-        <button id="perspAutoBtn" class="auto-detect-btn">🤖 Auto enderezar</button>
-        <button id="perspOkBtn">✅ Aplicar y continuar</button>
+        <button id="perspAutoBtn">🤖 Auto enderezar</button>
+        <button id="perspOkBtn">✅ Aplicar</button>
         <button id="perspSkipBtn" class="btn-secondary">⏭️ Sin corrección</button>
-        <button id="perspCancelBtn" style="background:#dc2626;">✖ Cancelar todo</button>
+        <button id="perspCancelBtn" style="background:#dc2626;">✖ Cancelar</button>
     </div>
 </div>
 
-<!-- MODAL CÁMARA MEJORADO (con flash y vista previa) -->
+<!-- MODAL CÁMARA -->
 <div id="cameraModal">
     <div class="camera-header">
-        <button id="flashToggleBtn" class="flash-btn">🔦 Flash</button>
         <button id="closeCameraBtn">Cerrar</button>
     </div>
     <div class="camera-loading" id="cameraLoading">📷 Iniciando cámara...</div>
@@ -371,32 +235,25 @@
         <canvas id="cameraOverlay"></canvas>
     </div>
     <div class="capture-btn-container">
-        <button id="capturePhotoBtn" class="capture-btn" aria-label="Tomar foto"></button>
+        <button id="capturePhotoBtn" class="capture-btn"></button>
     </div>
 </div>
 
-<!-- Overlay para vista previa de la foto capturada -->
+<!-- Overlay vista previa -->
 <div id="previewOverlay" class="preview-overlay">
-    <img id="previewImage" class="preview-img" alt="Vista previa">
-    <div class="preview-text">✅ Foto añadida a la cola</div>
+    <img id="previewImage" class="preview-img">
+    <div class="preview-text">✅ Foto añadida</div>
 </div>
 
 <script>
     // ==================== CONFIGURACIÓN ====================
-    const PAGE_WIDTH_MM = 211.6;
-    const PAGE_HEIGHT_MM = 320.1;
+    const PAGE_WIDTH_MM = 211.6, PAGE_HEIGHT_MM = 320.1;
     const ADMIN_EMAIL = "waroiapy@gmail.com";
 
     let imageQueue = [];
     let imageQueueA = [];
-
-    let currentStream = null;
-    let currentQueueTarget = null;
-    let currentPreviewContainerId = null;
-    let currentStatusId = null;
+    let currentStream = null, currentQueueTarget = null, currentPreviewContainerId = null;
     let animationFrameId = null;
-    let torchEnabled = false;
-    let currentVideoTrack = null;
 
     // Firebase
     const firebaseConfig = {
@@ -412,22 +269,14 @@
     const db = firebase.firestore();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // ==================== SONIDO DE CÁMARA ====================
+    // ==================== SONIDO ====================
     let audioCtx = null;
     function playShutterSound() {
         try {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            // Reanudar si está suspendido (por políticas del navegador)
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().then(() => {
-                    createBeep();
-                });
-            } else {
-                createBeep();
-            }
-        } catch(e) { console.warn("Audio no soportado", e); }
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume().then(() => createBeep());
+            else createBeep();
+        } catch(e) {}
     }
     function createBeep() {
         const now = audioCtx.currentTime;
@@ -435,7 +284,6 @@
         gain.connect(audioCtx.destination);
         gain.gain.setValueAtTime(0.3, now);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-        
         const osc = audioCtx.createOscillator();
         osc.type = 'sine';
         osc.frequency.value = 880;
@@ -444,933 +292,195 @@
         osc.stop(now + 0.15);
     }
 
-    // ==================== FLASH / TORCH ====================
-    async function setTorch(enable) {
-        if (!currentVideoTrack || !currentVideoTrack.getCapabilities) return;
-        const capabilities = currentVideoTrack.getCapabilities();
-        if (!capabilities.torch) {
-            console.log("Torch no soportado");
-            return;
-        }
-        try {
-            await currentVideoTrack.applyConstraints({ advanced: [{ torch: enable }] });
-            torchEnabled = enable;
-            const flashBtn = document.getElementById('flashToggleBtn');
-            if (enable) flashBtn.classList.add('active');
-            else flashBtn.classList.remove('active');
-        } catch(err) {
-            console.error("Error al activar flash:", err);
-        }
+    // ==================== FLASH DE PANTALLA (funciona siempre) ====================
+    function screenFlash() {
+        const flashDiv = document.createElement('div');
+        flashDiv.style.position = 'fixed';
+        flashDiv.style.top = flashDiv.style.left = '0';
+        flashDiv.style.width = flashDiv.style.height = '100%';
+        flashDiv.style.backgroundColor = 'white';
+        flashDiv.style.zIndex = '99999';
+        flashDiv.style.pointerEvents = 'none';
+        flashDiv.style.opacity = '0.9';
+        document.body.appendChild(flashDiv);
+        setTimeout(() => {
+            flashDiv.style.transition = 'opacity 0.2s';
+            flashDiv.style.opacity = '0';
+            setTimeout(() => flashDiv.remove(), 250);
+        }, 50);
     }
 
-    // ==================== CORRECCIÓN DE PERSPECTIVA (con OpenCV) ====================
+    // ==================== CORRECCIÓN PERSPECTIVA (OpenCV) ====================
     const perspModal = document.getElementById('perspModal');
     const perspCanvas = document.getElementById('perspCanvas');
     const ctx = perspCanvas.getContext('2d', { willReadFrequently: true });
-    let perspImage = null, perspScale = 1, perspPoints = [];
-    let draggingIdx = -1, perspResolve = null;
-
-    let opencvLoaded = false;
-    let opencvLoading = false;
+    let perspImage = null, perspScale = 1, perspPoints = [], draggingIdx = -1, perspResolve = null;
+    let opencvLoaded = false, opencvLoading = false;
     function loadOpenCV() {
         return new Promise((resolve, reject) => {
-            if (window.cv && window.cv.Mat) {
-                opencvLoaded = true;
-                resolve();
-                return;
-            }
-            if (opencvLoading) {
-                const checkInterval = setInterval(() => {
-                    if (opencvLoaded) {
-                        clearInterval(checkInterval);
-                        resolve();
-                    }
-                }, 100);
-                return;
-            }
+            if (window.cv && window.cv.Mat) { opencvLoaded = true; resolve(); return; }
+            if (opencvLoading) { const int = setInterval(() => { if (opencvLoaded) { clearInterval(int); resolve(); } }, 100); return; }
             opencvLoading = true;
             const script = document.createElement('script');
             script.src = 'https://docs.opencv.org/4.8.0/opencv.js';
-            script.onload = () => {
-                const check = setInterval(() => {
-                    if (window.cv && window.cv.Mat) {
-                        clearInterval(check);
-                        opencvLoaded = true;
-                        resolve();
-                    }
-                }, 100);
-            };
-            script.onerror = () => {
-                opencvLoading = false;
-                reject(new Error('No se pudo cargar OpenCV.js'));
-            };
+            script.onload = () => { const check = setInterval(() => { if (window.cv && window.cv.Mat) { clearInterval(check); opencvLoaded = true; resolve(); } }, 100); };
+            script.onerror = () => { opencvLoading = false; reject(new Error('OpenCV falló')); };
             document.head.appendChild(script);
         });
     }
-
     async function autoDetectarEsquinas() {
         if (!perspImage) return false;
         try {
             await loadOpenCV();
-            const imgElement = perspImage;
-            const src = cv.imread(imgElement);
-            const gray = new cv.Mat();
-            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-            const blurred = new cv.Mat();
-            cv.GaussianBlur(gray, blurred, { width: 5, height: 5 }, 0);
-            const edges = new cv.Mat();
-            cv.Canny(blurred, edges, 75, 200);
-            
-            const contours = new cv.MatVector();
-            const hierarchy = new cv.Mat();
+            const src = cv.imread(perspImage);
+            const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+            const blurred = new cv.Mat(); cv.GaussianBlur(gray, blurred, { width: 5, height: 5 }, 0);
+            const edges = new cv.Mat(); cv.Canny(blurred, edges, 75, 200);
+            const contours = new cv.MatVector(), hierarchy = new cv.Mat();
             cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-            
-            let maxArea = 0;
-            let docContour = null;
+            let maxArea = 0, docContour = null;
             for (let i = 0; i < contours.size(); i++) {
                 const cnt = contours.get(i);
                 const area = cv.contourArea(cnt);
-                const totalArea = imgElement.naturalWidth * imgElement.naturalHeight;
-                if (area < totalArea * 0.05) continue; // ignorar contornos muy pequeños
+                if (area < perspImage.naturalWidth * perspImage.naturalHeight * 0.05) continue;
                 const peri = cv.arcLength(cnt, true);
-                const approx = new cv.Mat();
-                cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-                if (approx.rows === 4 && area > maxArea) {
-                    maxArea = area;
-                    if (docContour) docContour.delete();
-                    docContour = approx.clone();
-                }
+                const approx = new cv.Mat(); cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+                if (approx.rows === 4 && area > maxArea) { maxArea = area; if (docContour) docContour.delete(); docContour = approx.clone(); }
                 approx.delete();
             }
-            
             if (docContour) {
                 let pts = [];
-                for (let i = 0; i < 4; i++) {
-                    const x = docContour.data32S[i*2];
-                    const y = docContour.data32S[i*2+1];
-                    pts.push({ x, y });
-                }
-                // Ordenar puntos: esquina superior izquierda, superior derecha, inferior derecha, inferior izquierda
+                for (let i = 0; i < 4; i++) pts.push({ x: docContour.data32S[i*2], y: docContour.data32S[i*2+1] });
                 const center = { x: pts.reduce((s,p)=>s+p.x,0)/4, y: pts.reduce((s,p)=>s+p.y,0)/4 };
-                pts.sort((a,b) => Math.atan2(a.y - center.y, a.x - center.x) - Math.atan2(b.y - center.y, b.x - center.x));
-                // Reordenar para que el primero sea el de menor x+y (top-left aproximado)
-                const tl = pts.reduce((best, p) => (p.x + p.y < best.x + best.y ? p : best), pts[0]);
-                const idxTL = pts.indexOf(tl);
+                pts.sort((a,b) => Math.atan2(a.y-center.y, a.x-center.x) - Math.atan2(b.y-center.y, b.x-center.x));
+                const tl = pts.reduce((best,p) => (p.x+p.y < best.x+best.y ? p : best), pts[0]);
+                const idx = pts.indexOf(tl);
                 const ordered = [];
-                for (let i = 0; i < 4; i++) ordered.push(pts[(idxTL + i) % 4]);
-                const scaled = ordered.map(p => ({ x: p.x * perspScale, y: p.y * perspScale }));
-                perspPoints = scaled;
+                for (let i=0;i<4;i++) ordered.push(pts[(idx+i)%4]);
+                perspPoints = ordered.map(p => ({ x: p.x * perspScale, y: p.y * perspScale }));
                 dibujarPerspCanvas();
                 docContour.delete();
                 src.delete(); gray.delete(); blurred.delete(); edges.delete(); contours.delete(); hierarchy.delete();
                 return true;
-            } else {
-                src.delete(); gray.delete(); blurred.delete(); edges.delete(); contours.delete(); hierarchy.delete();
-                alert('No se pudo detectar automáticamente el documento. Ajusta manualmente los puntos.');
-                return false;
             }
-        } catch (err) {
-            console.error('Error en auto detección:', err);
-            alert('Error en la detección automática: ' + err.message);
+            src.delete(); gray.delete(); blurred.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+            alert('No se detectó documento. Ajusta manualmente.');
             return false;
-        }
+        } catch(e) { alert('Error auto: '+e.message); return false; }
     }
-
-    function abrirPerspectiva(imgElement) {
-        return new Promise((resolve) => {
-            perspImage = imgElement;
-            perspResolve = resolve;
-            const maxW = Math.min(window.innerWidth * 0.95, 560);
-            const maxH = window.innerHeight * 0.65;
-            perspScale = Math.min(maxW / imgElement.naturalWidth, maxH / imgElement.naturalHeight);
-            perspCanvas.width = Math.round(imgElement.naturalWidth * perspScale);
-            perspCanvas.height = Math.round(imgElement.naturalHeight * perspScale);
-            const m = 20, w = perspCanvas.width, h = perspCanvas.height;
-            perspPoints = [
-                { x: m, y: m },
-                { x: w - m, y: m },
-                { x: w - m, y: h - m },
-                { x: m, y: h - m }
-            ];
-            dibujarPerspCanvas();
-            perspModal.classList.add('activo');
-        });
-    }
-
-    function cerrarPerspectiva(dataUrl, cancelado = false) {
-        perspModal.classList.remove('activo');
-        if (perspResolve) {
-            perspResolve(cancelado ? null : dataUrl);
-            perspResolve = null;
-        }
-    }
-
     function dibujarPerspCanvas() {
-        ctx.clearRect(0, 0, perspCanvas.width, perspCanvas.height);
-        ctx.drawImage(perspImage, 0, 0, perspCanvas.width, perspCanvas.height);
-        ctx.beginPath();
-        ctx.moveTo(perspPoints[0].x, perspPoints[0].y);
-        for (let i = 1; i < 4; i++) ctx.lineTo(perspPoints[i].x, perspPoints[i].y);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(30, 60, 114, 0.18)';
-        ctx.fill();
-        ctx.strokeStyle = '#1e3c72';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.beginPath();
-        ctx.moveTo(perspPoints[0].x, perspPoints[0].y);
-        ctx.lineTo(perspPoints[2].x, perspPoints[2].y);
-        ctx.moveTo(perspPoints[1].x, perspPoints[1].y);
-        ctx.lineTo(perspPoints[3].x, perspPoints[3].y);
-        ctx.stroke();
+        ctx.clearRect(0,0,perspCanvas.width,perspCanvas.height);
+        ctx.drawImage(perspImage,0,0,perspCanvas.width,perspCanvas.height);
+        ctx.beginPath(); ctx.moveTo(perspPoints[0].x,perspPoints[0].y);
+        for(let i=1;i<4;i++) ctx.lineTo(perspPoints[i].x,perspPoints[i].y);
+        ctx.closePath(); ctx.fillStyle='rgba(30,60,114,0.18)'; ctx.fill();
+        ctx.strokeStyle='#1e3c72'; ctx.lineWidth=2; ctx.stroke();
+        ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(255,255,255,0.5)';
+        ctx.beginPath(); ctx.moveTo(perspPoints[0].x,perspPoints[0].y); ctx.lineTo(perspPoints[2].x,perspPoints[2].y);
+        ctx.moveTo(perspPoints[1].x,perspPoints[1].y); ctx.lineTo(perspPoints[3].x,perspPoints[3].y); ctx.stroke();
         ctx.setLineDash([]);
-        const labels = ['↖', '↗', '↘', '↙'];
-        perspPoints.forEach((p, i) => {
-            ctx.beginPath(); ctx.arc(p.x, p.y, 18, 0, Math.PI * 2);
-            ctx.fillStyle = '#f59e0b'; ctx.fill();
-            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.fillStyle = 'white'; ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(labels[i], p.x, p.y);
-        });
+        const labels=['↖','↗','↘','↙'];
+        perspPoints.forEach((p,i)=>{ ctx.beginPath(); ctx.arc(p.x,p.y,18,0,Math.PI*2); ctx.fillStyle='#f59e0b'; ctx.fill(); ctx.strokeStyle='white'; ctx.lineWidth=2; ctx.stroke(); ctx.fillStyle='white'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(labels[i],p.x,p.y); });
     }
-
-    function getPerspPos(e) {
-        const rect = perspCanvas.getBoundingClientRect();
-        const scaleX = perspCanvas.width / rect.width, scaleY = perspCanvas.height / rect.height;
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
-    }
-
-    function encontrarPunto(pos) {
-        for (let i = 0; i < perspPoints.length; i++) {
-            const dx = perspPoints[i].x - pos.x, dy = perspPoints[i].y - pos.y;
-            if (Math.sqrt(dx*dx + dy*dy) < 30) return i;
-        }
-        return -1;
-    }
-
-    perspCanvas.addEventListener('mousedown', e => { draggingIdx = encontrarPunto(getPerspPos(e)); });
-    perspCanvas.addEventListener('touchstart', e => { e.preventDefault(); draggingIdx = encontrarPunto(getPerspPos(e)); }, { passive: false });
-    perspCanvas.addEventListener('mousemove', e => {
-        if (draggingIdx < 0) return;
-        const p = getPerspPos(e);
-        perspPoints[draggingIdx] = { x: Math.max(0, Math.min(perspCanvas.width, p.x)), y: Math.max(0, Math.min(perspCanvas.height, p.y)) };
-        dibujarPerspCanvas();
-    });
-    perspCanvas.addEventListener('touchmove', e => {
-        e.preventDefault();
-        if (draggingIdx < 0) return;
-        const p = getPerspPos(e);
-        perspPoints[draggingIdx] = { x: Math.max(0, Math.min(perspCanvas.width, p.x)), y: Math.max(0, Math.min(perspCanvas.height, p.y)) };
-        dibujarPerspCanvas();
-    }, { passive: false });
-    perspCanvas.addEventListener('mouseup', () => { draggingIdx = -1; });
-    perspCanvas.addEventListener('touchend', () => { draggingIdx = -1; });
-
-    // NUEVA función de corrección usando OpenCV (estable)
+    function getPerspPos(e) { const rect=perspCanvas.getBoundingClientRect(); const sx=perspCanvas.width/rect.width, sy=perspCanvas.height/rect.height; const cx=e.touches?e.touches[0].clientX:e.clientX, cy=e.touches?e.touches[0].clientY:e.clientY; return { x:(cx-rect.left)*sx, y:(cy-rect.top)*sy }; }
+    perspCanvas.addEventListener('mousedown',e=>{ draggingIdx = (()=>{ const pos=getPerspPos(e); for(let i=0;i<perspPoints.length;i++) if(Math.hypot(perspPoints[i].x-pos.x,perspPoints[i].y-pos.y)<30) return i; return -1; })(); });
+    perspCanvas.addEventListener('touchstart',e=>{ e.preventDefault(); draggingIdx = (()=>{ const pos=getPerspPos(e); for(let i=0;i<perspPoints.length;i++) if(Math.hypot(perspPoints[i].x-pos.x,perspPoints[i].y-pos.y)<30) return i; return -1; })(); },{passive:false});
+    perspCanvas.addEventListener('mousemove',e=>{ if(draggingIdx>=0){ const p=getPerspPos(e); perspPoints[draggingIdx]={ x:Math.max(0,Math.min(perspCanvas.width,p.x)), y:Math.max(0,Math.min(perspCanvas.height,p.y)) }; dibujarPerspCanvas(); } });
+    perspCanvas.addEventListener('touchmove',e=>{ e.preventDefault(); if(draggingIdx>=0){ const p=getPerspPos(e); perspPoints[draggingIdx]={ x:Math.max(0,Math.min(perspCanvas.width,p.x)), y:Math.max(0,Math.min(perspCanvas.height,p.y)) }; dibujarPerspCanvas(); } },{passive:false});
+    perspCanvas.addEventListener('mouseup',()=>draggingIdx=-1); perspCanvas.addEventListener('touchend',()=>draggingIdx=-1);
     async function aplicarPerspectiva() {
-        const pts = perspPoints.map(p => ({ x: p.x / perspScale, y: p.y / perspScale }));
-        // Calcular ancho y alto como distancias máximas entre puntos opuestos
-        const ancho = Math.round(Math.max(
-            Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
-            Math.hypot(pts[2].x - pts[3].x, pts[2].y - pts[3].y)
-        ));
-        const alto = Math.round(Math.max(
-            Math.hypot(pts[0].x - pts[3].x, pts[0].y - pts[3].y),
-            Math.hypot(pts[1].x - pts[2].x, pts[1].y - pts[2].y)
-        ));
-        if (ancho < 5 || alto < 5) {
-            alert("Los puntos seleccionados no forman un área válida. Ajusta manualmente.");
-            return perspImage.src;
-        }
+        const pts = perspPoints.map(p=>({ x:p.x/perspScale, y:p.y/perspScale }));
+        const ancho = Math.round(Math.max(Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y), Math.hypot(pts[2].x-pts[3].x,pts[2].y-pts[3].y)));
+        const alto = Math.round(Math.max(Math.hypot(pts[0].x-pts[3].x,pts[0].y-pts[3].y), Math.hypot(pts[1].x-pts[2].x,pts[1].y-pts[2].y)));
+        if(ancho<5||alto<5) { alert("Área no válida"); return perspImage.src; }
         await loadOpenCV();
-        const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, pts.flatMap(p => [p.x, p.y]));
-        const dstPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, ancho, 0, ancho, alto, 0, alto]);
+        const srcPoints = cv.matFromArray(4,1,cv.CV_32FC2, pts.flatMap(p=>[p.x,p.y]));
+        const dstPoints = cv.matFromArray(4,1,cv.CV_32FC2, [0,0,ancho,0,ancho,alto,0,alto]);
         const M = cv.getPerspectiveTransform(srcPoints, dstPoints);
         const srcMat = cv.imread(perspImage);
         const dstMat = new cv.Mat();
         cv.warpPerspective(srcMat, dstMat, M, new cv.Size(ancho, alto));
-        const canvas = document.createElement('canvas');
-        canvas.width = ancho;
-        canvas.height = alto;
-        const canvasCtx = canvas.getContext('2d');
-        canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.fillRect(0, 0, ancho, alto);
+        const canvas = document.createElement('canvas'); canvas.width=ancho; canvas.height=alto;
+        const canvasCtx = canvas.getContext('2d'); canvasCtx.fillStyle='#ffffff'; canvasCtx.fillRect(0,0,ancho,alto);
         cv.imshow(canvas, dstMat);
-        // Liberar memoria
         srcPoints.delete(); dstPoints.delete(); M.delete(); srcMat.delete(); dstMat.delete();
-        return canvas.toDataURL('image/jpeg', 0.92);
+        return canvas.toDataURL('image/jpeg',0.92);
     }
-
-    document.getElementById('perspAutoBtn').onclick = async () => {
-        const boton = document.getElementById('perspAutoBtn');
-        boton.disabled = true;
-        boton.innerHTML = '<span class="spinner"></span> Detectando...';
-        await autoDetectarEsquinas();
-        boton.disabled = false;
-        boton.innerHTML = '🤖 Auto enderezar';
-    };
-    document.getElementById('perspOkBtn').onclick = async () => {
-        const corregida = await aplicarPerspectiva();
-        cerrarPerspectiva(corregida);
-    };
-    document.getElementById('perspSkipBtn').onclick = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = perspImage.naturalWidth; canvas.height = perspImage.naturalHeight;
-        const skCtx = canvas.getContext('2d');
-        skCtx.fillStyle = '#ffffff';
-        skCtx.fillRect(0, 0, canvas.width, canvas.height);
-        skCtx.drawImage(perspImage, 0, 0);
-        cerrarPerspectiva(canvas.toDataURL('image/jpeg', 0.92));
-    };
-    document.getElementById('perspCancelBtn').onclick = () => {
-        cerrarPerspectiva(null, true);
-    };
-
-    // ==================== FUNCIONES PDF (sin cambios relevantes) ====================
-    function agregarMarcaAgua(pdf) {
-        const total = pdf.internal.getNumberOfPages();
-        for (let i = 1; i <= total; i++) {
-            pdf.setPage(i);
-            const w = pdf.internal.pageSize.getWidth(), h = pdf.internal.pageSize.getHeight();
-            pdf.setFontSize(7); pdf.setTextColor(180, 180, 180);
-            pdf.text('waro-ia \u00AE', w - 4, h - 3, { align: 'right' });
-        }
-    }
-
-    async function unirPdfs(files, statusEl) {
-        if (files.length < 2) { alert("Selecciona al menos 2 PDFs."); return; }
-        statusEl.innerHTML = '<span class="spinner"></span> Uniendo...';
-        try {
-            const { PDFDocument } = PDFLib;
-            const merged = await PDFDocument.create();
-            for (const file of files) {
-                if (file.size > 20 * 1024 * 1024) { alert(`El archivo ${file.name} supera 20MB`); return; }
-                const buf = await file.arrayBuffer();
-                const pdf = await PDFDocument.load(buf);
-                const pages = await merged.copyPages(pdf, pdf.getPageIndices());
-                pages.forEach(p => merged.addPage(p));
-            }
-            const { rgb } = PDFLib;
-            const helvetica = await merged.embedFont(PDFLib.StandardFonts.Helvetica);
-            const pages = merged.getPages();
-            for (const page of pages) {
-                const { width, height } = page.getSize();
-                page.drawText('waro-ia \u00AE', {
-                    x: width - 52, y: 8, size: 7, font: helvetica,
-                    color: rgb(0.7, 0.7, 0.7), opacity: 0.7
-                });
-            }
-            const bytes = await merged.save();
-            saveAs(new Blob([bytes], {type:'application/pdf'}), `union_${Date.now()}.pdf`);
-            statusEl.innerText = "✅ Unión completada.";
-        } catch(err) { statusEl.innerText = "Error: " + err.message; }
-    }
-
-    async function dividirPdf(buffer, start, end, statusEl) {
-        if (!buffer) { alert("Carga un PDF."); return; }
-        if (isNaN(start) || isNaN(end) || start < 1 || end < start) { alert("Rango inválido"); return; }
-        statusEl.innerHTML = '<span class="spinner"></span> Dividiendo...';
-        try {
-            const { PDFDocument } = PDFLib;
-            const src = await PDFDocument.load(buffer);
-            const total = src.getPageCount();
-            if (end > total) { alert(`Solo hay ${total} página(s)`); return; }
-            const newDoc = await PDFDocument.create();
-            const indices = Array.from({length: end - start + 1}, (_, i) => start - 1 + i);
-            const pages = await newDoc.copyPages(src, indices);
-            pages.forEach(p => newDoc.addPage(p));
-            const { rgb } = PDFLib;
-            const helvetica = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-            const outPages = newDoc.getPages();
-            for (const page of outPages) {
-                const { width, height } = page.getSize();
-                page.drawText('waro-ia \u00AE', {
-                    x: width - 52, y: 8, size: 7, font: helvetica,
-                    color: rgb(0.7, 0.7, 0.7), opacity: 0.7
-                });
-            }
-            const bytes = await newDoc.save();
-            saveAs(new Blob([bytes], {type:'application/pdf'}), `paginas_${start}_a_${end}.pdf`);
-            statusEl.innerText = "✅ Listo.";
-        } catch(err) { statusEl.innerText = "Error: " + err.message; }
-    }
-
-    async function comprimirPdf(buffer, statusEl) {
-        if (!buffer) { alert("Carga un PDF."); return; }
-        statusEl.innerHTML = '<span class="spinner"></span> Comprimiendo...';
-        try {
-            const pdf = await pdfjsLib.getDocument({ data: buffer.slice(0) }).promise;
-            const { jsPDF } = window.jspdf;
-            const newPdf = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH_MM, PAGE_HEIGHT_MM] });
-            for (let i = 1; i <= pdf.numPages; i++) {
-                statusEl.innerHTML = `<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`;
-                const page = await pdf.getPage(i);
-                const viewport = page.getViewport({ scale: 1.5 });
-                const canvas = document.createElement('canvas');
-                canvas.width = viewport.width; canvas.height = viewport.height;
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                const imgData = canvas.toDataURL('image/jpeg', 0.3);
-                const pageWidth = PAGE_WIDTH_MM, pageHeight = PAGE_HEIGHT_MM;
-                const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-                const drawWidth = canvas.width * ratio, drawHeight = canvas.height * ratio;
-                const x = (pageWidth - drawWidth) / 2, y = (pageHeight - drawHeight) / 2;
-                if (i > 1) newPdf.addPage();
-                newPdf.addImage(imgData, 'JPEG', x, y, drawWidth, drawHeight);
-            }
-            agregarMarcaAgua(newPdf);
-            const origKB = buffer.byteLength / 1024;
-            const output = newPdf.output('arraybuffer');
-            const newKB = output.byteLength / 1024;
-            saveAs(new Blob([output], {type:'application/pdf'}), `comprimido_${Date.now()}.pdf`);
-            statusEl.innerHTML = `✅ ${origKB.toFixed(0)}KB → ${newKB.toFixed(0)}KB <span style="color:#2c7a4d;font-weight:bold;">(${((1-newKB/origKB)*100).toFixed(0)}% reducción)</span>`;
-        } catch(err) { statusEl.innerText = "Error: " + err.message; console.error(err); }
-    }
-
-    // ==================== COLA DE IMÁGENES ====================
-    function agregarImagen(file, queue, previewContainerId) {
-        if (!file.type.startsWith('image/')) {
-            alert('Solo se permiten imágenes');
-            return;
-        }
-        if (file.size > 10 * 1024 * 1024) {
-            alert('La imagen no puede superar los 10 MB');
-            return;
-        }
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-        img.onload = () => {
-            if (img.naturalWidth === 0 || img.naturalHeight === 0) {
-                URL.revokeObjectURL(url);
-                alert('La imagen no se pudo cargar correctamente');
-                return;
-            }
-            queue.push({ dataUrl: url, name: file.name || 'captura', element: img });
-            renderizarCola(queue, previewContainerId);
-        };
-        img.onerror = () => {
-            URL.revokeObjectURL(url);
-            alert('Error al procesar la imagen');
-        };
-        img.src = url;
-    }
-
-    function revocarTodasLasUrls(queue) {
-        for (let item of queue) {
-            if (item.dataUrl && item.dataUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(item.dataUrl);
-            }
-        }
-    }
-
-    function renderizarCola(queue, containerId) {
-        const container = document.getElementById(containerId);
-        if (queue.length === 0) {
-            container.innerHTML = '🖼️ No hay imágenes';
-            return;
-        }
-        container.innerHTML = queue.map((img, idx) => `
-            <div class="queue-item">
-                <img src="${img.dataUrl}" class="img-thumb">
-                <div style="flex:1; font-size:0.85rem; word-break:break-all;">${escapeHtml(img.name)}</div>
-                <div class="queue-controls">
-                    <button class="btn-up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>▲</button>
-                    <button class="btn-down" data-idx="${idx}" ${idx === queue.length-1 ? 'disabled' : ''}>▼</button>
-                    <button class="btn-remove" data-idx="${idx}" style="background:#dc2626; color:white;">✕</button>
-                </div>
-            </div>
-        `).join('') + `<div style="font-size:0.8rem; color:#6b7280; margin-top:8px;">Total: ${queue.length} imagen(es)</div>`;
-
-        container.querySelectorAll('.btn-up').forEach(btn => {
-            btn.onclick = () => {
-                const i = parseInt(btn.dataset.idx);
-                if (i > 0) {
-                    [queue[i-1], queue[i]] = [queue[i], queue[i-1]];
-                    renderizarCola(queue, containerId);
-                }
-            };
-        });
-        container.querySelectorAll('.btn-down').forEach(btn => {
-            btn.onclick = () => {
-                const i = parseInt(btn.dataset.idx);
-                if (i < queue.length - 1) {
-                    [queue[i], queue[i+1]] = [queue[i+1], queue[i]];
-                    renderizarCola(queue, containerId);
-                }
-            };
-        });
-        container.querySelectorAll('.btn-remove').forEach(btn => {
-            btn.onclick = () => {
-                const i = parseInt(btn.dataset.idx);
-                const removed = queue.splice(i, 1)[0];
-                if (removed && removed.dataUrl) URL.revokeObjectURL(removed.dataUrl);
-                renderizarCola(queue, containerId);
-            };
+    function abrirPerspectiva(imgElement) {
+        return new Promise(resolve => {
+            perspImage = imgElement; perspResolve = resolve;
+            const maxW=Math.min(window.innerWidth*0.95,560), maxH=window.innerHeight*0.65;
+            perspScale = Math.min(maxW/imgElement.naturalWidth, maxH/imgElement.naturalHeight);
+            perspCanvas.width = Math.round(imgElement.naturalWidth*perspScale); perspCanvas.height = Math.round(imgElement.naturalHeight*perspScale);
+            const m=20, w=perspCanvas.width, h=perspCanvas.height;
+            perspPoints = [{x:m,y:m},{x:w-m,y:m},{x:w-m,y:h-m},{x:m,y:h-m}];
+            dibujarPerspCanvas(); perspModal.classList.add('activo');
         });
     }
+    function cerrarPerspectiva(dataUrl,cancelado=false){ perspModal.classList.remove('activo'); if(perspResolve) perspResolve(cancelado?null:dataUrl); perspResolve=null; }
+    document.getElementById('perspAutoBtn').onclick = async()=>{ const btn=document.getElementById('perspAutoBtn'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Detectando...'; await autoDetectarEsquinas(); btn.disabled=false; btn.innerHTML='🤖 Auto enderezar'; };
+    document.getElementById('perspOkBtn').onclick = async()=>{ const corregida=await aplicarPerspectiva(); cerrarPerspectiva(corregida); };
+    document.getElementById('perspSkipBtn').onclick =()=>{ const canvas=document.createElement('canvas'); canvas.width=perspImage.naturalWidth; canvas.height=perspImage.naturalHeight; const ctx=canvas.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.drawImage(perspImage,0,0); cerrarPerspectiva(canvas.toDataURL('image/jpeg',0.92)); };
+    document.getElementById('perspCancelBtn').onclick =()=>cerrarPerspectiva(null,true);
 
-    async function convertirColaAPdf(queue, statusEl, previewContainerId) {
-        if (queue.length === 0) {
-            alert('Agrega al menos una imagen');
-            return;
-        }
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({ unit: 'mm', format: [PAGE_WIDTH_MM, PAGE_HEIGHT_MM] });
-        const total = queue.length;
-        for (let i = 0; i < total; i++) {
-            statusEl.innerHTML = `<span class="spinner"></span> Procesando imagen ${i+1} de ${total}...`;
-            const imgObj = queue[i];
-            if (!imgObj.element || !imgObj.element.naturalWidth) {
-                statusEl.innerText = '❌ Error: imagen no válida';
-                return;
-            }
-            const dataUrlCorregida = await abrirPerspectiva(imgObj.element);
-            if (dataUrlCorregida === null) {
-                statusEl.innerText = '❌ Conversión cancelada';
-                return;
-            }
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = () => reject(new Error('No se pudo cargar la imagen corregida'));
-                img.src = dataUrlCorregida;
-            });
-            if (i > 0) pdf.addPage();
-            const imgWidthPx = img.width, imgHeightPx = img.height;
-            const ratio = Math.min(PAGE_WIDTH_MM / imgWidthPx, PAGE_HEIGHT_MM / imgHeightPx);
-            const drawWidth = imgWidthPx * ratio, drawHeight = imgHeightPx * ratio;
-            const x = (PAGE_WIDTH_MM - drawWidth) / 2, y = (PAGE_HEIGHT_MM - drawHeight) / 2;
-            pdf.addImage(dataUrlCorregida, 'JPEG', x, y, drawWidth, drawHeight);
-            if (dataUrlCorregida !== imgObj.dataUrl && dataUrlCorregida.startsWith('blob:')) {
-                URL.revokeObjectURL(dataUrlCorregida);
-            }
-        }
-        agregarMarcaAgua(pdf);
-        pdf.save(`scan_${Date.now()}.pdf`);
-        statusEl.innerHTML = `✅ PDF de ${total} páginas generado.`;
-        revocarTodasLasUrls(queue);
-        queue.length = 0;
-        renderizarCola(queue, previewContainerId);
-    }
+    // ==================== FUNCIONES PDF ====================
+    function agregarMarcaAgua(pdf) { for(let i=1;i<=pdf.internal.getNumberOfPages();i++){ pdf.setPage(i); const w=pdf.internal.pageSize.getWidth(), h=pdf.internal.pageSize.getHeight(); pdf.setFontSize(7); pdf.setTextColor(180,180,180); pdf.text('waro-ia \u00AE', w-4, h-3, { align:'right' }); } }
+    async function unirPdfs(files,statusEl){ if(files.length<2){ alert("Selecciona al menos 2 PDFs."); return; } statusEl.innerHTML='<span class="spinner"></span> Uniendo...'; try{ const{PDFDocument}=PDFLib; const merged=await PDFDocument.create(); for(const file of files){ if(file.size>20*1024*1024){ alert(`El archivo ${file.name} supera 20MB`); return; } const buf=await file.arrayBuffer(); const pdf=await PDFDocument.load(buf); const pages=await merged.copyPages(pdf,pdf.getPageIndices()); pages.forEach(p=>merged.addPage(p)); } const{rgb}=PDFLib; const helvetica=await merged.embedFont(PDFLib.StandardFonts.Helvetica); merged.getPages().forEach(page=>{ const{width,height}=page.getSize(); page.drawText('waro-ia \u00AE',{x:width-52,y:8,size:7,font:helvetica,color:rgb(0.7,0.7,0.7),opacity:0.7}); }); const bytes=await merged.save(); saveAs(new Blob([bytes],{type:'application/pdf'}),`union_${Date.now()}.pdf`); statusEl.innerText="✅ Unión completada."; }catch(err){ statusEl.innerText="Error: "+err.message; } }
+    async function dividirPdf(buffer,start,end,statusEl){ if(!buffer){ alert("Carga un PDF."); return; } if(isNaN(start)||isNaN(end)||start<1||end<start){ alert("Rango inválido"); return; } statusEl.innerHTML='<span class="spinner"></span> Dividiendo...'; try{ const{PDFDocument}=PDFLib; const src=await PDFDocument.load(buffer); const total=src.getPageCount(); if(end>total){ alert(`Solo hay ${total} página(s)`); return; } const newDoc=await PDFDocument.create(); const indices=Array.from({length:end-start+1},(_,i)=>start-1+i); const pages=await newDoc.copyPages(src,indices); pages.forEach(p=>newDoc.addPage(p)); const{rgb}=PDFLib; const helvetica=await newDoc.embedFont(PDFLib.StandardFonts.Helvetica); newDoc.getPages().forEach(page=>{ const{width,height}=page.getSize(); page.drawText('waro-ia \u00AE',{x:width-52,y:8,size:7,font:helvetica,color:rgb(0.7,0.7,0.7),opacity:0.7}); }); const bytes=await newDoc.save(); saveAs(new Blob([bytes],{type:'application/pdf'}),`paginas_${start}_a_${end}.pdf`); statusEl.innerText="✅ Listo."; }catch(err){ statusEl.innerText="Error: "+err.message; } }
+    async function comprimirPdf(buffer,statusEl){ if(!buffer){ alert("Carga un PDF."); return; } statusEl.innerHTML='<span class="spinner"></span> Comprimiendo...'; try{ const pdf=await pdfjsLib.getDocument({data:buffer.slice(0)}).promise; const{jsPDF}=window.jspdf; const newPdf=new jsPDF({unit:'mm',format:[PAGE_WIDTH_MM,PAGE_HEIGHT_MM]}); for(let i=1;i<=pdf.numPages;i++){ statusEl.innerHTML=`<span class="spinner"></span> Página ${i} de ${pdf.numPages}...`; const page=await pdf.getPage(i); const viewport=page.getViewport({scale:1.5}); const canvas=document.createElement('canvas'); canvas.width=viewport.width; canvas.height=viewport.height; await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise; const imgData=canvas.toDataURL('image/jpeg',0.3); const ratio=Math.min(PAGE_WIDTH_MM/canvas.width, PAGE_HEIGHT_MM/canvas.height); const drawWidth=canvas.width*ratio, drawHeight=canvas.height*ratio; const x=(PAGE_WIDTH_MM-drawWidth)/2, y=(PAGE_HEIGHT_MM-drawHeight)/2; if(i>1) newPdf.addPage(); newPdf.addImage(imgData,'JPEG',x,y,drawWidth,drawHeight); } agregarMarcaAgua(newPdf); const origKB=buffer.byteLength/1024; const output=newPdf.output('arraybuffer'); const newKB=output.byteLength/1024; saveAs(new Blob([output],{type:'application/pdf'}),`comprimido_${Date.now()}.pdf`); statusEl.innerHTML=`✅ ${origKB.toFixed(0)}KB → ${newKB.toFixed(0)}KB (${((1-newKB/origKB)*100).toFixed(0)}% reducción)`; }catch(err){ statusEl.innerText="Error: "+err.message; } }
 
-    // ==================== CÁMARA CON FLASH, SONIDO Y VISTA PREVIA ====================
-    async function iniciarCamara(queue, previewContainerId, statusId) {
-        currentQueueTarget = queue;
-        currentPreviewContainerId = previewContainerId;
-        currentStatusId = statusId;
-        const modal = document.getElementById('cameraModal');
-        const video = document.getElementById('cameraVideo');
-        const loadingDiv = document.getElementById('cameraLoading');
-        modal.classList.add('activo');
-        loadingDiv.style.display = 'block';
-        try {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            currentStream = stream;
-            currentVideoTrack = stream.getVideoTracks()[0];
-            video.srcObject = stream;
-            await video.play();
-            loadingDiv.style.display = 'none';
-            await new Promise(resolve => {
-                const check = setInterval(() => {
-                    if (video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2) {
-                        clearInterval(check);
-                        resolve();
-                    }
-                }, 100);
-            });
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            function drawFrame() {
-                if (!video.videoWidth || video.videoWidth === 0) {
-                    animationFrameId = requestAnimationFrame(drawFrame);
-                    return;
-                }
-                const overlay = document.getElementById('cameraOverlay');
-                const container = document.querySelector('.video-container');
-                const rect = container.getBoundingClientRect();
-                overlay.width = rect.width;
-                overlay.height = rect.height;
-                const ctxOverlay = overlay.getContext('2d');
-                ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
-                const marginX = overlay.width * 0.1;
-                const marginY = overlay.height * 0.15;
-                const frameW = overlay.width - marginX * 2;
-                const frameH = overlay.height - marginY * 2;
-                ctxOverlay.strokeStyle = '#fff';
-                ctxOverlay.lineWidth = 3;
-                ctxOverlay.setLineDash([10, 15]);
-                ctxOverlay.strokeRect(marginX, marginY, frameW, frameH);
-                ctxOverlay.setLineDash([]);
-                ctxOverlay.strokeStyle = '#4caf50';
-                ctxOverlay.lineWidth = 2;
-                ctxOverlay.strokeRect(marginX, marginY, frameW, frameH);
-                const cornerLen = 20;
-                ctxOverlay.beginPath();
-                ctxOverlay.moveTo(marginX, marginY + cornerLen);
-                ctxOverlay.lineTo(marginX, marginY);
-                ctxOverlay.lineTo(marginX + cornerLen, marginY);
-                ctxOverlay.moveTo(marginX + frameW - cornerLen, marginY);
-                ctxOverlay.lineTo(marginX + frameW, marginY);
-                ctxOverlay.lineTo(marginX + frameW, marginY + cornerLen);
-                ctxOverlay.moveTo(marginX + frameW, marginY + frameH - cornerLen);
-                ctxOverlay.lineTo(marginX + frameW, marginY + frameH);
-                ctxOverlay.lineTo(marginX + frameW - cornerLen, marginY + frameH);
-                ctxOverlay.moveTo(marginX + cornerLen, marginY + frameH);
-                ctxOverlay.lineTo(marginX, marginY + frameH);
-                ctxOverlay.lineTo(marginX, marginY + frameH - cornerLen);
-                ctxOverlay.stroke();
-                animationFrameId = requestAnimationFrame(drawFrame);
-            }
-            drawFrame();
-        } catch (err) {
-            loadingDiv.innerText = '❌ Error al acceder a la cámara: ' + err.message;
-            console.error(err);
-        }
-    }
+    // ==================== COLA IMÁGENES ====================
+    function agregarImagen(file,queue,previewContainerId){ if(!file.type.startsWith('image/')){ alert('Solo imágenes'); return; } if(file.size>10*1024*1024){ alert('Máximo 10 MB'); return; } const url=URL.createObjectURL(file); const img=new Image(); img.onload=()=>{ if(img.naturalWidth===0||img.naturalHeight===0){ URL.revokeObjectURL(url); alert('Imagen inválida'); return; } queue.push({dataUrl:url,name:file.name||'captura',element:img}); renderizarCola(queue,previewContainerId); }; img.onerror=()=>{ URL.revokeObjectURL(url); alert('Error al cargar imagen'); }; img.src=url; }
+    function revocarTodasLasUrls(queue){ for(let item of queue) if(item.dataUrl && item.dataUrl.startsWith('blob:')) URL.revokeObjectURL(item.dataUrl); }
+    function renderizarCola(queue,containerId){ const container=document.getElementById(containerId); if(queue.length===0){ container.innerHTML='🖼️ No hay imágenes'; return; } container.innerHTML=queue.map((img,idx)=>`<div class="queue-item"><img src="${img.dataUrl}" class="img-thumb"><div style="flex:1;">${escapeHtml(img.name)}</div><div class="queue-controls"><button class="btn-up" data-idx="${idx}" ${idx===0?'disabled':''}>▲</button><button class="btn-down" data-idx="${idx}" ${idx===queue.length-1?'disabled':''}>▼</button><button class="btn-remove" data-idx="${idx}" style="background:#dc2626;">✕</button></div></div>`).join('')+`<div>Total: ${queue.length}</div>`; container.querySelectorAll('.btn-up').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); if(i>0){ [queue[i-1],queue[i]]=[queue[i],queue[i-1]]; renderizarCola(queue,containerId); } }); container.querySelectorAll('.btn-down').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); if(i<queue.length-1){ [queue[i],queue[i+1]]=[queue[i+1],queue[i]]; renderizarCola(queue,containerId); } }); container.querySelectorAll('.btn-remove').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); const removed=queue.splice(i,1)[0]; if(removed && removed.dataUrl) URL.revokeObjectURL(removed.dataUrl); renderizarCola(queue,containerId); }); }
+    async function convertirColaAPdf(queue,statusEl,previewContainerId){ if(queue.length===0){ alert('Agrega al menos una imagen'); return; } const{jsPDF}=window.jspdf; const pdf=new jsPDF({unit:'mm',format:[PAGE_WIDTH_MM,PAGE_HEIGHT_MM]}); for(let i=0;i<queue.length;i++){ statusEl.innerHTML=`<span class="spinner"></span> Imagen ${i+1} de ${queue.length}...`; const imgObj=queue[i]; if(!imgObj.element||!imgObj.element.naturalWidth){ statusEl.innerText='❌ Error'; return; } const dataUrlCorregida=await abrirPerspectiva(imgObj.element); if(dataUrlCorregida===null){ statusEl.innerText='❌ Cancelado'; return; } const img=new Image(); await new Promise((resolve,reject)=>{ img.onload=resolve; img.onerror=reject; img.src=dataUrlCorregida; }); if(i>0) pdf.addPage(); const ratio=Math.min(PAGE_WIDTH_MM/img.width, PAGE_HEIGHT_MM/img.height); const drawWidth=img.width*ratio, drawHeight=img.height*ratio; const x=(PAGE_WIDTH_MM-drawWidth)/2, y=(PAGE_HEIGHT_MM-drawHeight)/2; pdf.addImage(dataUrlCorregida,'JPEG',x,y,drawWidth,drawHeight); if(dataUrlCorregida!==imgObj.dataUrl && dataUrlCorregida.startsWith('blob:')) URL.revokeObjectURL(dataUrlCorregida); } agregarMarcaAgua(pdf); pdf.save(`scan_${Date.now()}.pdf`); statusEl.innerHTML=`✅ PDF de ${queue.length} páginas generado.`; revocarTodasLasUrls(queue); queue.length=0; renderizarCola(queue,previewContainerId); }
 
-    async function mostrarPreviewYCerrar(dataUrl) {
-        return new Promise((resolve) => {
-            const overlay = document.getElementById('previewOverlay');
-            const previewImg = document.getElementById('previewImage');
-            previewImg.src = dataUrl;
-            overlay.classList.add('active');
-            setTimeout(() => {
-                overlay.classList.remove('active');
-                resolve();
-            }, 1500);
-        });
-    }
+    // ==================== CÁMARA (con flash de pantalla) ====================
+    async function iniciarCamara(queue,previewContainerId,statusId){ currentQueueTarget=queue; currentPreviewContainerId=previewContainerId; const modal=document.getElementById('cameraModal'); const video=document.getElementById('cameraVideo'); const loadingDiv=document.getElementById('cameraLoading'); modal.classList.add('activo'); loadingDiv.style.display='block'; try{ if(currentStream) currentStream.getTracks().forEach(t=>t.stop()); const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); currentStream=stream; video.srcObject=stream; await video.play(); loadingDiv.style.display='none'; await new Promise(resolve=>{ const check=setInterval(()=>{ if(video.videoWidth>0&&video.videoHeight>0&&video.readyState>=2){ clearInterval(check); resolve(); } },100); }); if(animationFrameId) cancelAnimationFrame(animationFrameId); function drawFrame(){ if(!video.videoWidth){ animationFrameId=requestAnimationFrame(drawFrame); return; } const overlay=document.getElementById('cameraOverlay'); const container=document.querySelector('.video-container'); const rect=container.getBoundingClientRect(); overlay.width=rect.width; overlay.height=rect.height; const ctxOverlay=overlay.getContext('2d'); ctxOverlay.clearRect(0,0,overlay.width,overlay.height); const marginX=overlay.width*0.1, marginY=overlay.height*0.15; const frameW=overlay.width-marginX*2, frameH=overlay.height-marginY*2; ctxOverlay.strokeStyle='#fff'; ctxOverlay.lineWidth=3; ctxOverlay.setLineDash([10,15]); ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); ctxOverlay.setLineDash([]); ctxOverlay.strokeStyle='#4caf50'; ctxOverlay.lineWidth=2; ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); const cornerLen=20; ctxOverlay.beginPath(); ctxOverlay.moveTo(marginX,marginY+cornerLen); ctxOverlay.lineTo(marginX,marginY); ctxOverlay.lineTo(marginX+cornerLen,marginY); ctxOverlay.moveTo(marginX+frameW-cornerLen,marginY); ctxOverlay.lineTo(marginX+frameW,marginY); ctxOverlay.lineTo(marginX+frameW,marginY+cornerLen); ctxOverlay.moveTo(marginX+frameW,marginY+frameH-cornerLen); ctxOverlay.lineTo(marginX+frameW,marginY+frameH); ctxOverlay.lineTo(marginX+frameW-cornerLen,marginY+frameH); ctxOverlay.moveTo(marginX+cornerLen,marginY+frameH); ctxOverlay.lineTo(marginX,marginY+frameH); ctxOverlay.lineTo(marginX,marginY+frameH-cornerLen); ctxOverlay.stroke(); animationFrameId=requestAnimationFrame(drawFrame); } drawFrame(); }catch(err){ loadingDiv.innerText='❌ Error cámara: '+err.message; } }
+    async function mostrarPreviewYCerrar(dataUrl){ return new Promise(resolve=>{ const overlay=document.getElementById('previewOverlay'); const previewImg=document.getElementById('previewImage'); previewImg.src=dataUrl; overlay.classList.add('active'); setTimeout(()=>{ overlay.classList.remove('active'); resolve(); },1500); }); }
+    async function capturarFoto(){ const video=document.getElementById('cameraVideo'); if(!video.videoWidth||video.videoWidth===0){ alert('Cámara no lista'); return; } screenFlash(); playShutterSound(); const doCapture=()=>{ const canvas=document.createElement('canvas'); canvas.width=video.videoWidth; canvas.height=video.videoHeight; const ctx=canvas.getContext('2d',{willReadFrequently:true}); ctx.drawImage(video,0,0,canvas.width,canvas.height); canvas.toBlob(async blob=>{ if(blob){ const dataUrl=URL.createObjectURL(blob); await mostrarPreviewYCerrar(dataUrl); const file=new File([blob],`foto_${Date.now()}.jpg`,{type:'image/jpeg'}); agregarImagen(file,currentQueueTarget,currentPreviewContainerId); URL.revokeObjectURL(dataUrl); }else alert('Error al capturar'); },'image/jpeg',0.92); }; if('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(()=>doCapture()); else setTimeout(doCapture,150); }
+    function cerrarCamara(){ const modal=document.getElementById('cameraModal'); modal.classList.remove('activo'); if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream=null; } document.getElementById('cameraVideo').srcObject=null; if(animationFrameId) cancelAnimationFrame(animationFrameId); const overlay=document.getElementById('cameraOverlay'); const ctxOverlay=overlay.getContext('2d'); ctxOverlay.clearRect(0,0,overlay.width,overlay.height); }
+    document.getElementById('closeCameraBtn').onclick=cerrarCamara;
+    document.getElementById('capturePhotoBtn').onclick=capturarFoto;
 
-    async function capturarFoto() {
-        const video = document.getElementById('cameraVideo');
-        if (!video.videoWidth || video.videoWidth === 0 || video.readyState < 2) {
-            alert('La cámara aún no está lista, espera un momento');
-            return;
-        }
-        // Reproducir sonido
-        playShutterSound();
-        // Si el flash está encendido, intentar dar un destello (opcional)
-        if (torchEnabled) {
-            // pequeño efecto visual: el flash ya está encendido, no hacemos nada extra
-        }
-        const doCapture = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob(async blob => {
-                if (blob) {
-                    const dataUrl = URL.createObjectURL(blob);
-                    // Mostrar vista previa durante 1.5 segundos
-                    await mostrarPreviewYCerrar(dataUrl);
-                    const file = new File([blob], `foto_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                    agregarImagen(file, currentQueueTarget, currentPreviewContainerId);
-                    URL.revokeObjectURL(dataUrl);
-                } else {
-                    alert('Error al capturar la foto');
-                }
-            }, 'image/jpeg', 0.92);
-        };
-        if ('requestVideoFrameCallback' in video) {
-            video.requestVideoFrameCallback(() => doCapture());
-        } else {
-            setTimeout(() => doCapture(), 150);
-        }
-    }
+    // ==================== AUTENTICACIÓN Y ADMIN ====================
+    function mostrarPantalla(tipo){ const authForms=document.getElementById('authForms'), userInfo=document.getElementById('userInfo'), appFunc=document.getElementById('appFunctions'), pending=document.getElementById('pendingScreen'), adminPanel=document.getElementById('adminPanel'), adminBadge=document.getElementById('adminBadgeContainer'); authForms.style.display='none'; userInfo.style.display='none'; appFunc.style.display='none'; pending.style.display='none'; adminPanel.style.display='none'; adminBadge.innerHTML=''; if(tipo==='login') authForms.style.display='block'; else if(tipo==='pending'){ pending.style.display='block'; userInfo.style.display='block'; document.getElementById('planStatus').innerHTML='⏳ Pendiente de aprobación'; }else if(tipo==='app'){ appFunc.style.display='block'; userInfo.style.display='block'; }else if(tipo==='admin'){ adminPanel.style.display='block'; userInfo.style.display='block'; document.getElementById('planStatus').innerHTML='👑 Administrador'; adminBadge.innerHTML='<div class="admin-badge">ADMIN</div>'; } }
+    async function cargarUsuariosAdmin(){ try{ const snapshot=await db.collection('users').get(); const pendientes=[], aprobados=[], rechazados=[]; snapshot.forEach(doc=>{ const d={...doc.data(), id:doc.id}; if(d.rol==='admin') return; const estado=(d.estado||'pendiente').toLowerCase(); if(estado==='pendiente') pendientes.push(d); else if(estado==='aprobado') aprobados.push(d); else if(estado==='rechazado') rechazados.push(d); }); const render=(containerId,usuarios,showActions)=>{ const container=document.getElementById(containerId); if(!usuarios.length){ container.innerHTML='<p style="text-align:center;color:#6b7280;">No hay usuarios</p>'; return; } container.innerHTML=usuarios.map(u=>`<div class="user-row"><div class="user-info"><b>${escapeHtml(u.email)}</b><br><span style="font-size:0.75rem;">Registro: ${u.fechaRegistro?.toDate?.()?.toLocaleDateString()||'N/D'} | Días: ${u.diasRestantes??30}</span></div><div class="user-actions">${showActions? `<button class="btn-approve" data-id="${u.id}" style="background:#2c7a4d;">✅ Aprobar</button><button class="btn-reject" data-id="${u.id}" style="background:#dc2626;">❌ Rechazar</button>`: `<button class="btn-renew" data-id="${u.id}" style="background:#f59e0b;">🔄 Renovar</button><button class="btn-delete" data-id="${u.id}" style="background:#dc2626;">🗑️ Eliminar</button>`}</div></div>`).join(''); if(showActions){ container.querySelectorAll('.btn-approve').forEach(btn=>btn.onclick=()=>aprobarUsuario(btn.dataset.id)); container.querySelectorAll('.btn-reject').forEach(btn=>btn.onclick=()=>rechazarUsuario(btn.dataset.id)); }else{ container.querySelectorAll('.btn-renew').forEach(btn=>btn.onclick=()=>renovarSuscripcion(btn.dataset.id)); container.querySelectorAll('.btn-delete').forEach(btn=>btn.onclick=()=>eliminarUsuario(btn.dataset.id)); } }; render('tabPendientes',pendientes,true); render('tabAprobados',aprobados,false); render('tabRechazados',rechazados,false); }catch(err){ console.error(err); ['tabPendientes','tabAprobados','tabRechazados'].forEach(id=>document.getElementById(id).innerHTML=`<div class="error-msg">Error: ${err.message}</div>`); } }
+    async function aprobarUsuario(id){ try{ await db.collection('users').doc(id).update({aprobado:true, estado:'aprobado', diasRestantes:30, fechaAprobacion:firebase.firestore.FieldValue.serverTimestamp()}); await cargarUsuariosAdmin(); }catch(err){ alert('Error: '+err.message); } }
+    async function rechazarUsuario(id){ if(!confirm('¿Rechazar esta cuenta?')) return; try{ await db.collection('users').doc(id).update({aprobado:false, estado:'rechazado', fechaRechazo:firebase.firestore.FieldValue.serverTimestamp()}); await cargarUsuariosAdmin(); }catch(err){ alert('Error: '+err.message); } }
+    async function renovarSuscripcion(id){ if(!confirm('¿Renovar suscripción a 30 días?')) return; try{ await db.collection('users').doc(id).update({diasRestantes:30, fechaAprobacion:firebase.firestore.FieldValue.serverTimestamp()}); await cargarUsuariosAdmin(); alert('Suscripción renovada a 30 días'); }catch(err){ alert('Error: '+err.message); } }
+    async function eliminarUsuario(id){ if(!confirm('⚠️ Eliminar usuario permanentemente. ¿Continuar?')) return; try{ await db.collection('users').doc(id).delete(); await cargarUsuariosAdmin(); }catch(err){ alert('Error: '+err.message); } }
+    auth.onAuthStateChanged(async user=>{ if(!user){ mostrarPantalla('login'); return; } try{ const docRef=db.collection('users').doc(user.uid); const doc=await docRef.get(); let esAdmin=false; if(doc.exists && doc.data().rol==='admin') esAdmin=true; else if(user.email===ADMIN_EMAIL && !doc.exists){ await docRef.set({email:user.email, fechaRegistro:firebase.firestore.FieldValue.serverTimestamp(), plan:'trial_30d', aprobado:true, estado:'aprobado', diasRestantes:30, rol:'admin'}); esAdmin=true; } if(esAdmin){ mostrarPantalla('admin'); await cargarUsuariosAdmin(); return; } if(!doc.exists){ await docRef.set({email:user.email, fechaRegistro:firebase.firestore.FieldValue.serverTimestamp(), plan:'trial_30d', aprobado:false, estado:'pendiente', diasRestantes:30}); mostrarPantalla('pending'); return; } const data=doc.data(); if(data.aprobado && data.estado==='aprobado'){ const fechaBase=(data.fechaAprobacion||data.fechaRegistro)?.toDate()||new Date(); const diasRestantes=Math.max(0,30-Math.floor((new Date()-fechaBase)/86400000)); document.getElementById('planStatus').innerHTML=diasRestantes>0?`✅ Plan activo: ${diasRestantes} día(s) restantes`:'⛔ Plan expirado'; mostrarPantalla('app'); }else if(data.estado==='rechazado'){ mostrarPantalla('login'); document.getElementById('authMessage').innerText='Cuenta rechazada por el administrador.'; await auth.signOut(); }else mostrarPantalla('pending'); }catch(err){ mostrarPantalla('login'); console.error(err); } });
+    document.getElementById('loginBtn').onclick=async()=>{ const email=document.getElementById('email').value.trim(), pwd=document.getElementById('password').value; if(!email||!pwd){ document.getElementById('authMessage').innerText='Completa campos'; return; } try{ await auth.signInWithEmailAndPassword(email,pwd); document.getElementById('authMessage').innerText=''; }catch(err){ document.getElementById('authMessage').innerText='Error: '+err.message; } };
+    document.getElementById('registerBtn').onclick=async()=>{ const email=document.getElementById('email').value.trim(), pwd=document.getElementById('password').value; if(!email||!pwd){ document.getElementById('authMessage').innerText='Completa campos'; return; } if(pwd.length<6){ document.getElementById('authMessage').innerText='Mínimo 6 caracteres'; return; } try{ await auth.createUserWithEmailAndPassword(email,pwd); document.getElementById('authMessage').innerText='✅ Registro exitoso. Espera aprobación.'; }catch(err){ document.getElementById('authMessage').innerText='Error: '+err.message; } };
+    document.getElementById('forgotBtn').onclick=async()=>{ const email=document.getElementById('email').value.trim(); if(!email){ alert('Escribe tu correo'); return; } try{ await auth.sendPasswordResetEmail(email); alert('Correo de recuperación enviado'); }catch(err){ alert('Error: '+err.message); } };
+    document.getElementById('logoutBtn').onclick=()=>auth.signOut();
+    document.getElementById('refreshPendingBtn').onclick=()=>{ if(auth.currentUser) auth.currentUser.reload().then(()=>auth.onAuthStateChanged(()=>{})); };
+    document.getElementById('recargarUsuariosBtn').onclick=()=>cargarUsuariosAdmin();
+    // Tabs admin
+    document.querySelectorAll('.admin-tab').forEach(tab=>{ tab.onclick=()=>{ document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active'); const target=tab.dataset.tab; document.querySelectorAll('.tab-content').forEach(cont=>cont.classList.remove('active')); document.getElementById(`tab${target.charAt(0).toUpperCase()+target.slice(1)}`).classList.add('active'); }; });
 
-    function cerrarCamara() {
-        const modal = document.getElementById('cameraModal');
-        modal.classList.remove('activo');
-        if (currentStream) {
-            currentStream.getTracks().forEach(track => track.stop());
-            currentStream = null;
-        }
-        if (currentVideoTrack) {
-            currentVideoTrack = null;
-        }
-        const video = document.getElementById('cameraVideo');
-        video.srcObject = null;
-        currentQueueTarget = null;
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-        }
-        const overlay = document.getElementById('cameraOverlay');
-        const ctxOverlay = overlay.getContext('2d');
-        ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
-        // Apagar flash si estaba encendido
-        if (torchEnabled) {
-            setTorch(false).catch(console.warn);
-        }
-    }
+    // ==================== INICIALIZAR HERRAMIENTAS ====================
+    function initTools(prefix, queue, previewId, statusId){ const cameraBtn=document.getElementById(`cameraBtn${prefix}`); if(cameraBtn) cameraBtn.onclick=()=>iniciarCamara(queue,previewId,statusId); const gallery=document.getElementById(`galleryInput${prefix}`); if(gallery) gallery.addEventListener('change',e=>{ if(e.target.files[0]) agregarImagen(e.target.files[0],queue,previewId); e.target.value=''; }); const clearBtn=document.getElementById(`clearQueue${prefix}`); if(clearBtn) clearBtn.onclick=()=>{ revocarTodasLasUrls(queue); queue.length=0; renderizarCola(queue,previewId); }; const convertBtn=prefix===''?'convertToPdfBtn':'convertBtnA'; document.getElementById(convertBtn).onclick=()=>convertirColaAPdf(queue,document.getElementById(statusId),previewId); }
+    initTools('', imageQueue, 'imagePreviewArea', 'imgStatus');
+    initTools('A', imageQueueA, 'previewA', 'statusImgA');
 
-    // ==================== AUTENTICACIÓN (sin cambios) ====================
-    function mostrarPantalla(tipo) {
-        const authFormsDiv = document.getElementById('authForms');
-        const userInfoDiv = document.getElementById('userInfo');
-        const appFunctionsDiv = document.getElementById('appFunctions');
-        const pendingScreenDiv = document.getElementById('pendingScreen');
-        const adminPanelDiv = document.getElementById('adminPanel');
-        const adminBadgeContainer = document.getElementById('adminBadgeContainer');
-        authFormsDiv.style.display = 'none';
-        userInfoDiv.style.display = 'none';
-        appFunctionsDiv.style.display = 'none';
-        pendingScreenDiv.style.display = 'none';
-        adminPanelDiv.style.display = 'none';
-        adminBadgeContainer.innerHTML = '';
-        switch(tipo) {
-            case 'login': authFormsDiv.style.display = 'block'; break;
-            case 'pending':
-                pendingScreenDiv.style.display = 'block';
-                userInfoDiv.style.display = 'block';
-                document.getElementById('planStatus').innerHTML = '⏳ Pendiente de aprobación';
-                break;
-            case 'app':
-                appFunctionsDiv.style.display = 'block';
-                userInfoDiv.style.display = 'block';
-                break;
-            case 'admin':
-                adminPanelDiv.style.display = 'block';
-                userInfoDiv.style.display = 'block';
-                document.getElementById('planStatus').innerHTML = '👑 Administrador';
-                adminBadgeContainer.innerHTML = '<div class="admin-badge">ADMIN</div>';
-                break;
-        }
-    }
+    let mergeFiles=[], mergeFilesA=[]; let splitBuf=null, splitBufA=null, compBuf=null, compBufA=null;
+    document.getElementById('unionPdfInput').onchange=e=>{ mergeFiles=Array.from(e.target.files); document.getElementById('mergeListArea').innerText=mergeFiles.length?`✅ ${mergeFiles.length} PDFs`:'Ninguno'; };
+    document.getElementById('mergeBtn').onclick=()=>unirPdfs(mergeFiles,document.getElementById('mergeStatus'));
+    document.getElementById('mergeInputA').onchange=e=>{ mergeFilesA=Array.from(e.target.files); document.getElementById('mergeListA').innerText=mergeFilesA.length?`✅ ${mergeFilesA.length} PDFs`:'Ninguno'; };
+    document.getElementById('mergeBtnA').onclick=()=>unirPdfs(mergeFilesA,document.getElementById('statusMergeA'));
+    document.getElementById('splitPdfInput').onchange=async e=>{ if(e.target.files[0]) splitBuf=await e.target.files[0].arrayBuffer(); };
+    document.getElementById('splitDoBtn').onclick=()=>dividirPdf(splitBuf,parseInt(document.getElementById('pagInicio').value),parseInt(document.getElementById('pagFin').value),document.getElementById('splitStatus'));
+    document.getElementById('splitInputA').onchange=async e=>{ if(e.target.files[0]) splitBufA=await e.target.files[0].arrayBuffer(); };
+    document.getElementById('splitBtnA').onclick=()=>dividirPdf(splitBufA,parseInt(document.getElementById('splitStartA').value),parseInt(document.getElementById('splitEndA').value),document.getElementById('statusSplitA'));
+    document.getElementById('compressPdfInput').onchange=async e=>{ if(e.target.files[0]) compBuf=await e.target.files[0].arrayBuffer(); };
+    document.getElementById('compressBtn').onclick=()=>comprimirPdf(compBuf,document.getElementById('compressStatus'));
+    document.getElementById('compressInputA').onchange=async e=>{ if(e.target.files[0]) compBufA=await e.target.files[0].arrayBuffer(); };
+    document.getElementById('compressBtnA').onclick=()=>comprimirPdf(compBufA,document.getElementById('statusCompressA'));
 
-    async function verificarUsuario(user) {
-        if (!user) { mostrarPantalla('login'); return; }
-        const currentUser = user;
-        try {
-            const docRef = db.collection('users').doc(user.uid);
-            const doc = await docRef.get();
-            let esAdmin = false;
-            if (doc.exists && doc.data().rol === 'admin') {
-                esAdmin = true;
-            } else if (user.email === ADMIN_EMAIL && !doc.exists) {
-                await docRef.set({
-                    email: user.email,
-                    fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
-                    plan: 'trial_30d', aprobado: true,
-                    estado: 'aprobado', diasRestantes: 30,
-                    rol: 'admin'
-                });
-                esAdmin = true;
-            }
-            if (esAdmin) {
-                mostrarPantalla('admin');
-                await cargarUsuariosAdmin();
-                return;
-            }
-            if (!doc.exists) {
-                await docRef.set({
-                    email: user.email,
-                    fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
-                    plan: 'trial_30d', aprobado: false,
-                    estado: 'pendiente', diasRestantes: 30
-                });
-                mostrarPantalla('pending');
-                return;
-            }
-            const userData = doc.data();
-            if (userData.aprobado === true && userData.estado === 'aprobado') {
-                const fechaBase = (userData.fechaAprobacion || userData.fechaRegistro)?.toDate() || new Date();
-                const diasRestantes = Math.max(0, 30 - Math.floor((new Date() - fechaBase) / 86400000));
-                document.getElementById('planStatus').innerHTML = diasRestantes > 0 ? `✅ Plan activo: ${diasRestantes} día(s) restantes` : `⛔ Plan expirado`;
-                mostrarPantalla('app');
-            } else if (userData.estado === 'rechazado') {
-                mostrarPantalla('login');
-                document.getElementById('authMessage').innerText = "Tu solicitud fue rechazada por el administrador.";
-                await auth.signOut();
-            } else { mostrarPantalla('pending'); }
-        } catch (err) {
-            console.error(err);
-            document.getElementById('authMessage').innerText = "Error al verificar cuenta: " + err.message;
-            mostrarPantalla('login');
-        }
-    }
-
-    async function cargarUsuariosAdmin() {
-        ['pendingUsersList','approvedUsersList','rejectedUsersList'].forEach(id => {
-            document.getElementById(id).innerHTML = '<span class="spinner" style="border-color:#1e3c72;border-top-color:transparent;"></span> Cargando...';
-        });
-        try {
-            const snapshot = await db.collection('users').get();
-            const pendientes = [], aprobados = [], rechazados = [];
-            snapshot.forEach(doc => {
-                const d = { ...doc.data(), id: doc.id };
-                if (d.rol === 'admin') return;
-                const estado = (d.estado || 'pendiente').toLowerCase();
-                if (estado === 'pendiente') pendientes.push(d);
-                else if (estado === 'aprobado') aprobados.push(d);
-                else if (estado === 'rechazado') rechazados.push(d);
-            });
-            const renderizarLista = (containerId, usuarios, conAcciones) => {
-                const container = document.getElementById(containerId);
-                if (!usuarios.length) { container.innerHTML = '<p style="color:#9ca3af;text-align:center;">No hay usuarios</p>'; return; }
-                container.innerHTML = usuarios.map(u => {
-                    const fecha = u.fechaRegistro?.toDate?.() ? u.fechaRegistro.toDate().toLocaleDateString('es-ES') : 'N/D';
-                    const estado = (u.estado || 'pendiente').toLowerCase();
-                    return `<div class="user-row">
-                        <div class="user-info">
-                            <div style="font-weight:bold;word-break:break-all;">${escapeHtml(u.email)}</div>
-                            <div style="font-size:0.75rem;color:#6b7280;">${fecha} | <span class="${estado}">${estado.toUpperCase()}</span>${u.diasRestantes !== undefined ? ` | ${u.diasRestantes} días` : ''}</div>
-                        </div>
-                        <div class="user-actions">
-                            ${conAcciones ? `<button onclick="aprobarUsuario('${u.id}')" style="background:#2c7a4d;padding:6px 12px;font-size:0.8rem;">✅</button>
-                               <button onclick="rechazarUsuario('${u.id}')" style="background:#dc2626;padding:6px 12px;font-size:0.8rem;">❌</button>`
-                            : `<button onclick="restablecerUsuario('${u.id}')" style="background:#f59e0b;color:#1e3c72;padding:6px 10px;font-size:0.75rem;">↩️</button>`}
-                        </div>
-                    </div>`;
-                }).join('');
-            };
-            renderizarLista('pendingUsersList', pendientes, true);
-            renderizarLista('approvedUsersList', aprobados, false);
-            renderizarLista('rejectedUsersList', rechazados, false);
-        } catch(err) {
-            const html = `<div class="error-msg">❌ Error: ${err.message}</div>`;
-            ['pendingUsersList','approvedUsersList','rejectedUsersList'].forEach(id => {
-                document.getElementById(id).innerHTML = html;
-            });
-        }
-    }
-    window.aprobarUsuario = async (id) => {
-        try { await db.collection('users').doc(id).update({ aprobado: true, estado: 'aprobado', diasRestantes: 30, fechaAprobacion: firebase.firestore.FieldValue.serverTimestamp() }); await cargarUsuariosAdmin(); }
-        catch(err) { alert('Error: ' + err.message); }
-    };
-    window.rechazarUsuario = async (id) => {
-        if (!confirm('¿Rechazar esta cuenta?')) return;
-        try { await db.collection('users').doc(id).update({ aprobado: false, estado: 'rechazado', fechaRechazo: firebase.firestore.FieldValue.serverTimestamp() }); await cargarUsuariosAdmin(); }
-        catch(err) { alert('Error: ' + err.message); }
-    };
-    window.restablecerUsuario = async (id) => {
-        if (!confirm('¿Restablecer a pendiente?')) return;
-        try { await db.collection('users').doc(id).update({ aprobado: false, estado: 'pendiente' }); await cargarUsuariosAdmin(); }
-        catch(err) { alert('Error: ' + err.message); }
-    };
-
-    auth.onAuthStateChanged(async (user) => {
-        if (user) await verificarUsuario(user);
-        else mostrarPantalla('login');
-    });
-
-    document.getElementById('loginBtn').onclick = async () => {
-        const email = document.getElementById('email').value.trim(), password = document.getElementById('password').value;
-        if (!email || !password) { document.getElementById('authMessage').innerText = "Correo y contraseña requeridos."; return; }
-        try { await auth.signInWithEmailAndPassword(email, password); document.getElementById('authMessage').innerText = ""; }
-        catch(err) { document.getElementById('authMessage').innerText = "Error: " + err.message; }
-    };
-    document.getElementById('registerBtn').onclick = async () => {
-        const email = document.getElementById('email').value.trim(), password = document.getElementById('password').value;
-        if (!email || !password) { document.getElementById('authMessage').innerText = "Correo y contraseña requeridos."; return; }
-        if (password.length < 6) { document.getElementById('authMessage').innerText = "La contraseña debe tener al menos 6 caracteres."; return; }
-        try { await auth.createUserWithEmailAndPassword(email, password); document.getElementById('authMessage').innerText = "✅ Registro exitoso. Esperando aprobación."; }
-        catch(err) { document.getElementById('authMessage').innerText = "Error: " + err.message; }
-    };
-    document.getElementById('forgotBtn').onclick = async () => {
-        const email = document.getElementById('email').value.trim();
-        if (!email) { document.getElementById('authMessage').innerText = "Escribe tu correo arriba primero."; return; }
-        try { await auth.sendPasswordResetEmail(email); document.getElementById('authMessage').innerText = "✅ Correo de recuperación enviado a " + email; }
-        catch(err) { document.getElementById('authMessage').innerText = "Error: " + err.message; }
-    };
-    document.getElementById('logoutBtn').onclick = async () => { await auth.signOut(); };
-    document.getElementById('refreshPendingBtn').onclick = async () => { if (auth.currentUser) await verificarUsuario(auth.currentUser); };
-    document.getElementById('recargarUsuariosBtn').onclick = async () => { await cargarUsuariosAdmin(); };
-
-    // ==================== INICIALIZACIÓN ====================
-    function initImageTools(prefix, queueRef, previewId, statusId) {
-        const cameraBtn = document.getElementById(`cameraBtn${prefix}`);
-        if (cameraBtn) {
-            cameraBtn.onclick = () => iniciarCamara(queueRef, previewId, statusId);
-        }
-        const galleryInput = document.getElementById(`galleryInput${prefix}`);
-        if (galleryInput) {
-            galleryInput.addEventListener('change', e => {
-                if (e.target.files.length) {
-                    agregarImagen(e.target.files[0], queueRef, previewId);
-                    e.target.value = '';
-                }
-            });
-        }
-        const clearBtn = document.getElementById(`clearQueue${prefix}`);
-        if (clearBtn) {
-            clearBtn.onclick = () => {
-                revocarTodasLasUrls(queueRef);
-                queueRef.length = 0;
-                renderizarCola(queueRef, previewId);
-            };
-        }
-        const convertBtnId = prefix === '' ? 'convertToPdfBtn' : 'convertBtnA';
-        document.getElementById(convertBtnId).addEventListener('click', () => {
-            convertirColaAPdf(queueRef, document.getElementById(statusId), previewId);
-        });
-    }
-
-    initImageTools('', imageQueue, 'imagePreviewArea', 'imgStatus');
-    initImageTools('A', imageQueueA, 'previewA', 'statusImgA');
-
-    let mergeFiles = [];
-    document.getElementById('unionPdfInput').addEventListener('change', e => {
-        mergeFiles = Array.from(e.target.files);
-        document.getElementById('mergeListArea').innerText = mergeFiles.length ? `✅ ${mergeFiles.length} PDFs seleccionados` : "Ninguno";
-    });
-    document.getElementById('mergeBtn').addEventListener('click', () => unirPdfs(mergeFiles, document.getElementById('mergeStatus')));
-
-    let mergeFilesA = [];
-    document.getElementById('mergeInputA').addEventListener('change', e => {
-        mergeFilesA = Array.from(e.target.files);
-        document.getElementById('mergeListA').innerText = mergeFilesA.length ? `✅ ${mergeFilesA.length} PDFs seleccionados` : "Ninguno";
-    });
-    document.getElementById('mergeBtnA').addEventListener('click', () => unirPdfs(mergeFilesA, document.getElementById('statusMergeA')));
-
-    let splitBuf = null;
-    document.getElementById('splitPdfInput').addEventListener('change', async e => {
-        if (e.target.files[0]) { splitBuf = await e.target.files[0].arrayBuffer(); document.getElementById('splitStatus').innerText = `✅ ${e.target.files[0].name}`; }
-    });
-    document.getElementById('splitDoBtn').addEventListener('click', () => dividirPdf(splitBuf, parseInt(document.getElementById('pagInicio').value), parseInt(document.getElementById('pagFin').value), document.getElementById('splitStatus')));
-
-    let splitBufA = null;
-    document.getElementById('splitInputA').addEventListener('change', async e => {
-        if (e.target.files[0]) { splitBufA = await e.target.files[0].arrayBuffer(); document.getElementById('statusSplitA').innerText = `✅ ${e.target.files[0].name}`; }
-    });
-    document.getElementById('splitBtnA').addEventListener('click', () => dividirPdf(splitBufA, parseInt(document.getElementById('splitStartA').value), parseInt(document.getElementById('splitEndA').value), document.getElementById('statusSplitA')));
-
-    let compBuf = null;
-    document.getElementById('compressPdfInput').addEventListener('change', async e => {
-        if (e.target.files[0]) { compBuf = await e.target.files[0].arrayBuffer(); document.getElementById('compressStatus').innerText = `📁 ${e.target.files[0].name}`; }
-    });
-    document.getElementById('compressBtn').addEventListener('click', () => comprimirPdf(compBuf, document.getElementById('compressStatus')));
-
-    let compBufA = null;
-    document.getElementById('compressInputA').addEventListener('change', async e => {
-        if (e.target.files[0]) { compBufA = await e.target.files[0].arrayBuffer(); document.getElementById('statusCompressA').innerText = `📁 ${e.target.files[0].name}`; }
-    });
-    document.getElementById('compressBtnA').addEventListener('click', () => comprimirPdf(compBufA, document.getElementById('statusCompressA')));
-
-    document.getElementById('closeCameraBtn').addEventListener('click', cerrarCamara);
-    document.getElementById('capturePhotoBtn').addEventListener('click', capturarFoto);
-    document.getElementById('flashToggleBtn').addEventListener('click', () => {
-        if (!currentVideoTrack) return;
-        setTorch(!torchEnabled);
-    });
-
-    function escapeHtml(str) {
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-
-    console.log("✅ App cargada con corrección OpenCV, sonido, flash y vista previa.");
+    function escapeHtml(str){ return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m; }); }
+    console.log("✅ App lista con admin panel y flash de pantalla");
 </script>
 </body>
 </html>
