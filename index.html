@@ -105,7 +105,6 @@
             <button id="forgotBtn" class="forgot-btn">¿Olvidaste tu contraseña?</button>
             <div id="authMessage" class="status" style="color:#ffd966;"></div>
             
-            <!-- Enlace de WhatsApp para activación rápida y soporte -->
             <div class="whatsapp-link">
                 <a href="https://wa.me/595984414224?text=Hola%2C%20necesito%20activaci%C3%B3n%20r%C3%A1pida%20para%20Scanner%20PDF%20Pro" target="_blank">
                     📱 ¿Necesitas activación rápida o soporte? Contáctanos por WhatsApp
@@ -119,7 +118,7 @@
         </div>
     </div>
 
-    <!-- PANTALLA PENDIENTE (usuario no aprobado) -->
+    <!-- PANTALLA PENDIENTE -->
     <div id="pendingScreen" style="display:none;">
         <div class="card pending-card">
             <h2>⏳ Cuenta en revisión</h2>
@@ -132,7 +131,7 @@
         </div>
     </div>
 
-    <!-- PANEL ADMIN (solo para waroiapy@gmail.com) -->
+    <!-- PANEL ADMIN -->
     <div id="adminPanel" style="display:none;">
         <div class="card" style="background:#1e3c72; color:white;">
             <h2>👑 Panel de Control</h2>
@@ -188,7 +187,7 @@
         </div>
     </div>
 
-    <!-- FUNCIONES PARA USUARIO NORMAL -->
+    <!-- FUNCIONES USUARIO NORMAL -->
     <div id="appFunctions" style="display:none;">
         <div class="card">
             <div>📸 Foto / Imagen a PDF</div>
@@ -303,7 +302,7 @@
         osc.stop(now + 0.15);
     }
 
-    // ==================== FLASH DE PANTALLA (funciona siempre) ====================
+    // ==================== FLASH DE PANTALLA ====================
     function screenFlash() {
         const flashDiv = document.createElement('div');
         flashDiv.style.position = 'fixed';
@@ -446,7 +445,7 @@
     function renderizarCola(queue,containerId){ const container=document.getElementById(containerId); if(queue.length===0){ container.innerHTML='🖼️ No hay imágenes'; return; } container.innerHTML=queue.map((img,idx)=>`<div class="queue-item"><img src="${img.dataUrl}" class="img-thumb"><div style="flex:1;">${escapeHtml(img.name)}</div><div class="queue-controls"><button class="btn-up" data-idx="${idx}" ${idx===0?'disabled':''}>▲</button><button class="btn-down" data-idx="${idx}" ${idx===queue.length-1?'disabled':''}>▼</button><button class="btn-remove" data-idx="${idx}" style="background:#dc2626;">✕</button></div></div>`).join('')+`<div>Total: ${queue.length}</div>`; container.querySelectorAll('.btn-up').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); if(i>0){ [queue[i-1],queue[i]]=[queue[i],queue[i-1]]; renderizarCola(queue,containerId); } }); container.querySelectorAll('.btn-down').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); if(i<queue.length-1){ [queue[i],queue[i+1]]=[queue[i+1],queue[i]]; renderizarCola(queue,containerId); } }); container.querySelectorAll('.btn-remove').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); const removed=queue.splice(i,1)[0]; if(removed && removed.dataUrl) URL.revokeObjectURL(removed.dataUrl); renderizarCola(queue,containerId); }); }
     async function convertirColaAPdf(queue,statusEl,previewContainerId){ if(queue.length===0){ alert('Agrega al menos una imagen'); return; } const{jsPDF}=window.jspdf; const pdf=new jsPDF({unit:'mm',format:[PAGE_WIDTH_MM,PAGE_HEIGHT_MM]}); for(let i=0;i<queue.length;i++){ statusEl.innerHTML=`<span class="spinner"></span> Imagen ${i+1} de ${queue.length}...`; const imgObj=queue[i]; if(!imgObj.element||!imgObj.element.naturalWidth){ statusEl.innerText='❌ Error'; return; } const dataUrlCorregida=await abrirPerspectiva(imgObj.element); if(dataUrlCorregida===null){ statusEl.innerText='❌ Cancelado'; return; } const img=new Image(); await new Promise((resolve,reject)=>{ img.onload=resolve; img.onerror=reject; img.src=dataUrlCorregida; }); if(i>0) pdf.addPage(); const ratio=Math.min(PAGE_WIDTH_MM/img.width, PAGE_HEIGHT_MM/img.height); const drawWidth=img.width*ratio, drawHeight=img.height*ratio; const x=(PAGE_WIDTH_MM-drawWidth)/2, y=(PAGE_HEIGHT_MM-drawHeight)/2; pdf.addImage(dataUrlCorregida,'JPEG',x,y,drawWidth,drawHeight); if(dataUrlCorregida!==imgObj.dataUrl && dataUrlCorregida.startsWith('blob:')) URL.revokeObjectURL(dataUrlCorregida); } agregarMarcaAgua(pdf); pdf.save(`scan_${Date.now()}.pdf`); statusEl.innerHTML=`✅ PDF de ${queue.length} páginas generado.`; revocarTodasLasUrls(queue); queue.length=0; renderizarCola(queue,previewContainerId); }
 
-    // ==================== CÁMARA (con flash de pantalla) ====================
+    // ==================== CÁMARA (flash pantalla) ====================
     async function iniciarCamara(queue,previewContainerId,statusId){ currentQueueTarget=queue; currentPreviewContainerId=previewContainerId; const modal=document.getElementById('cameraModal'); const video=document.getElementById('cameraVideo'); const loadingDiv=document.getElementById('cameraLoading'); modal.classList.add('activo'); loadingDiv.style.display='block'; try{ if(currentStream) currentStream.getTracks().forEach(t=>t.stop()); const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); currentStream=stream; video.srcObject=stream; await video.play(); loadingDiv.style.display='none'; await new Promise(resolve=>{ const check=setInterval(()=>{ if(video.videoWidth>0&&video.videoHeight>0&&video.readyState>=2){ clearInterval(check); resolve(); } },100); }); if(animationFrameId) cancelAnimationFrame(animationFrameId); function drawFrame(){ if(!video.videoWidth){ animationFrameId=requestAnimationFrame(drawFrame); return; } const overlay=document.getElementById('cameraOverlay'); const container=document.querySelector('.video-container'); const rect=container.getBoundingClientRect(); overlay.width=rect.width; overlay.height=rect.height; const ctxOverlay=overlay.getContext('2d'); ctxOverlay.clearRect(0,0,overlay.width,overlay.height); const marginX=overlay.width*0.1, marginY=overlay.height*0.15; const frameW=overlay.width-marginX*2, frameH=overlay.height-marginY*2; ctxOverlay.strokeStyle='#fff'; ctxOverlay.lineWidth=3; ctxOverlay.setLineDash([10,15]); ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); ctxOverlay.setLineDash([]); ctxOverlay.strokeStyle='#4caf50'; ctxOverlay.lineWidth=2; ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); const cornerLen=20; ctxOverlay.beginPath(); ctxOverlay.moveTo(marginX,marginY+cornerLen); ctxOverlay.lineTo(marginX,marginY); ctxOverlay.lineTo(marginX+cornerLen,marginY); ctxOverlay.moveTo(marginX+frameW-cornerLen,marginY); ctxOverlay.lineTo(marginX+frameW,marginY); ctxOverlay.lineTo(marginX+frameW,marginY+cornerLen); ctxOverlay.moveTo(marginX+frameW,marginY+frameH-cornerLen); ctxOverlay.lineTo(marginX+frameW,marginY+frameH); ctxOverlay.lineTo(marginX+frameW-cornerLen,marginY+frameH); ctxOverlay.moveTo(marginX+cornerLen,marginY+frameH); ctxOverlay.lineTo(marginX,marginY+frameH); ctxOverlay.lineTo(marginX,marginY+frameH-cornerLen); ctxOverlay.stroke(); animationFrameId=requestAnimationFrame(drawFrame); } drawFrame(); }catch(err){ loadingDiv.innerText='❌ Error cámara: '+err.message; } }
     async function mostrarPreviewYCerrar(dataUrl){ return new Promise(resolve=>{ const overlay=document.getElementById('previewOverlay'); const previewImg=document.getElementById('previewImage'); previewImg.src=dataUrl; overlay.classList.add('active'); setTimeout(()=>{ overlay.classList.remove('active'); resolve(); },1500); }); }
     async function capturarFoto(){ const video=document.getElementById('cameraVideo'); if(!video.videoWidth||video.videoWidth===0){ alert('Cámara no lista'); return; } screenFlash(); playShutterSound(); const doCapture=()=>{ const canvas=document.createElement('canvas'); canvas.width=video.videoWidth; canvas.height=video.videoHeight; const ctx=canvas.getContext('2d',{willReadFrequently:true}); ctx.drawImage(video,0,0,canvas.width,canvas.height); canvas.toBlob(async blob=>{ if(blob){ const dataUrl=URL.createObjectURL(blob); await mostrarPreviewYCerrar(dataUrl); const file=new File([blob],`foto_${Date.now()}.jpg`,{type:'image/jpeg'}); agregarImagen(file,currentQueueTarget,currentPreviewContainerId); URL.revokeObjectURL(dataUrl); }else alert('Error al capturar'); },'image/jpeg',0.92); }; if('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(()=>doCapture()); else setTimeout(doCapture,150); }
@@ -454,20 +453,133 @@
     document.getElementById('closeCameraBtn').onclick=cerrarCamara;
     document.getElementById('capturePhotoBtn').onclick=capturarFoto;
 
-    // ==================== AUTENTICACIÓN Y ADMIN ====================
-    function mostrarPantalla(tipo){ const authForms=document.getElementById('authForms'), userInfo=document.getElementById('userInfo'), appFunc=document.getElementById('appFunctions'), pending=document.getElementById('pendingScreen'), adminPanel=document.getElementById('adminPanel'), adminBadge=document.getElementById('adminBadgeContainer'); authForms.style.display='none'; userInfo.style.display='none'; appFunc.style.display='none'; pending.style.display='none'; adminPanel.style.display='none'; adminBadge.innerHTML=''; if(tipo==='login') authForms.style.display='block'; else if(tipo==='pending'){ pending.style.display='block'; userInfo.style.display='block'; document.getElementById('planStatus').innerHTML='⏳ Pendiente de aprobación'; }else if(tipo==='app'){ appFunc.style.display='block'; userInfo.style.display='block'; }else if(tipo==='admin'){ adminPanel.style.display='block'; userInfo.style.display='block'; document.getElementById('planStatus').innerHTML='👑 Administrador'; adminBadge.innerHTML='<div class="admin-badge">ADMIN</div>'; } }
-    async function cargarUsuariosAdmin(){ try{ const snapshot=await db.collection('users').get(); const pendientes=[], aprobados=[], rechazados=[]; snapshot.forEach(doc=>{ const d={...doc.data(), id:doc.id}; if(d.rol==='admin') return; const estado=(d.estado||'pendiente').toLowerCase(); if(estado==='pendiente') pendientes.push(d); else if(estado==='aprobado') aprobados.push(d); else if(estado==='rechazado') rechazados.push(d); }); const render=(containerId,usuarios,showActions)=>{ const container=document.getElementById(containerId); if(!usuarios.length){ container.innerHTML='<p style="text-align:center;color:#6b7280;">No hay usuarios</p>'; return; } container.innerHTML=usuarios.map(u=>`<div class="user-row"><div class="user-info"><b>${escapeHtml(u.email)}</b><br><span style="font-size:0.75rem;">Registro: ${u.fechaRegistro?.toDate?.()?.toLocaleDateString()||'N/D'} | Días: ${u.diasRestantes??30}</span></div><div class="user-actions">${showActions? `<button class="btn-approve" data-id="${u.id}" style="background:#2c7a4d;">✅ Aprobar</button><button class="btn-reject" data-id="${u.id}" style="background:#dc2626;">❌ Rechazar</button>`: `<button class="btn-renew" data-id="${u.id}" style="background:#f59e0b;">🔄 Renovar</button><button class="btn-delete" data-id="${u.id}" style="background:#dc2626;">🗑️ Eliminar</button>`}</div></div>`).join(''); if(showActions){ container.querySelectorAll('.btn-approve').forEach(btn=>btn.onclick=()=>aprobarUsuario(btn.dataset.id)); container.querySelectorAll('.btn-reject').forEach(btn=>btn.onclick=()=>rechazarUsuario(btn.dataset.id)); }else{ container.querySelectorAll('.btn-renew').forEach(btn=>btn.onclick=()=>renovarSuscripcion(btn.dataset.id)); container.querySelectorAll('.btn-delete').forEach(btn=>btn.onclick=()=>eliminarUsuario(btn.dataset.id)); } }; render('tabPendientes',pendientes,true); render('tabAprobados',aprobados,false); render('tabRechazados',rechazados,false); }catch(err){ console.error(err); ['tabPendientes','tabAprobados','tabRechazados'].forEach(id=>document.getElementById(id).innerHTML=`<div class="error-msg">Error: ${err.message}</div>`); } }
+    // ==================== AUTENTICACIÓN Y ADMIN (CORREGIDO) ====================
+    function mostrarPantalla(tipo){ 
+        const authForms=document.getElementById('authForms');
+        const userInfo=document.getElementById('userInfo');
+        const appFunc=document.getElementById('appFunctions');
+        const pending=document.getElementById('pendingScreen');
+        const adminPanel=document.getElementById('adminPanel');
+        const adminBadge=document.getElementById('adminBadgeContainer');
+        authForms.style.display='none';
+        userInfo.style.display='none';
+        appFunc.style.display='none';
+        pending.style.display='none';
+        adminPanel.style.display='none';
+        adminBadge.innerHTML='';
+        if(tipo==='login') authForms.style.display='block';
+        else if(tipo==='pending'){ pending.style.display='block'; userInfo.style.display='block'; document.getElementById('planStatus').innerHTML='⏳ Pendiente de aprobación'; }
+        else if(tipo==='app'){ appFunc.style.display='block'; userInfo.style.display='block'; }
+        else if(tipo==='admin'){ adminPanel.style.display='block'; userInfo.style.display='block'; document.getElementById('planStatus').innerHTML='👑 Administrador'; adminBadge.innerHTML='<div class="admin-badge">ADMIN</div>'; }
+    }
+
+    async function verificarUsuario(user) {
+        if (!user) { mostrarPantalla('login'); return; }
+        try {
+            // FORZAR ADMIN para el correo específico
+            if (user.email === ADMIN_EMAIL) {
+                const adminRef = db.collection('users').doc(user.uid);
+                // Actualizar o crear documento con rol admin
+                await adminRef.set({
+                    email: user.email,
+                    rol: 'admin',
+                    estado: 'aprobado',
+                    aprobado: true,
+                    diasRestantes: 30,
+                    fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
+                    fechaAprobacion: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                mostrarPantalla('admin');
+                await cargarUsuariosAdmin();
+                return;
+            }
+
+            // Para usuarios normales
+            const docRef = db.collection('users').doc(user.uid);
+            const doc = await docRef.get();
+            
+            if (!doc.exists) {
+                await docRef.set({
+                    email: user.email,
+                    fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
+                    plan: 'trial_30d',
+                    aprobado: false,
+                    estado: 'pendiente',
+                    diasRestantes: 30
+                });
+                mostrarPantalla('pending');
+                return;
+            }
+            
+            const userData = doc.data();
+            if (userData.aprobado === true && userData.estado === 'aprobado') {
+                const fechaBase = (userData.fechaAprobacion || userData.fechaRegistro)?.toDate() || new Date();
+                const diasRestantes = Math.max(0, 30 - Math.floor((new Date() - fechaBase) / 86400000));
+                document.getElementById('planStatus').innerHTML = diasRestantes > 0 ? `✅ Plan activo: ${diasRestantes} día(s) restantes` : '⛔ Plan expirado';
+                mostrarPantalla('app');
+            } else if (userData.estado === 'rechazado') {
+                mostrarPantalla('login');
+                document.getElementById('authMessage').innerText = 'Tu cuenta ha sido rechazada.';
+                await auth.signOut();
+            } else {
+                mostrarPantalla('pending');
+            }
+        } catch (err) {
+            console.error(err);
+            mostrarPantalla('login');
+            document.getElementById('authMessage').innerText = "Error al verificar cuenta: " + err.message;
+        }
+    }
+
+    async function cargarUsuariosAdmin(){ 
+        try{ 
+            const snapshot=await db.collection('users').get(); 
+            const pendientes=[], aprobados=[], rechazados=[]; 
+            snapshot.forEach(doc=>{ 
+                const d={...doc.data(), id:doc.id}; 
+                if(d.rol==='admin') return; 
+                const estado=(d.estado||'pendiente').toLowerCase(); 
+                if(estado==='pendiente') pendientes.push(d); 
+                else if(estado==='aprobado') aprobados.push(d); 
+                else if(estado==='rechazado') rechazados.push(d); 
+            }); 
+            const render=(containerId,usuarios,showActions)=>{ 
+                const container=document.getElementById(containerId); 
+                if(!usuarios.length){ container.innerHTML='<p style="text-align:center;color:#6b7280;">No hay usuarios</p>'; return; } 
+                container.innerHTML=usuarios.map(u=>`<div class="user-row"><div class="user-info"><b>${escapeHtml(u.email)}</b><br><span style="font-size:0.75rem;">Registro: ${u.fechaRegistro?.toDate?.()?.toLocaleDateString()||'N/D'} | Días: ${u.diasRestantes??30}</span></div><div class="user-actions">${showActions? `<button class="btn-approve" data-id="${u.id}" style="background:#2c7a4d;">✅ Aprobar</button><button class="btn-reject" data-id="${u.id}" style="background:#dc2626;">❌ Rechazar</button>`: `<button class="btn-renew" data-id="${u.id}" style="background:#f59e0b;">🔄 Renovar</button><button class="btn-delete" data-id="${u.id}" style="background:#dc2626;">🗑️ Eliminar</button>`}</div></div>`).join(''); 
+                if(showActions){ 
+                    container.querySelectorAll('.btn-approve').forEach(btn=>btn.onclick=()=>aprobarUsuario(btn.dataset.id)); 
+                    container.querySelectorAll('.btn-reject').forEach(btn=>btn.onclick=()=>rechazarUsuario(btn.dataset.id)); 
+                }else{ 
+                    container.querySelectorAll('.btn-renew').forEach(btn=>btn.onclick=()=>renovarSuscripcion(btn.dataset.id)); 
+                    container.querySelectorAll('.btn-delete').forEach(btn=>btn.onclick=()=>eliminarUsuario(btn.dataset.id)); 
+                } 
+            }; 
+            render('tabPendientes',pendientes,true); 
+            render('tabAprobados',aprobados,false); 
+            render('tabRechazados',rechazados,false); 
+        }catch(err){ 
+            console.error(err); 
+            ['tabPendientes','tabAprobados','tabRechazados'].forEach(id=>document.getElementById(id).innerHTML=`<div class="error-msg">Error: ${err.message}</div>`); 
+        } 
+    }
     async function aprobarUsuario(id){ try{ await db.collection('users').doc(id).update({aprobado:true, estado:'aprobado', diasRestantes:30, fechaAprobacion:firebase.firestore.FieldValue.serverTimestamp()}); await cargarUsuariosAdmin(); }catch(err){ alert('Error: '+err.message); } }
     async function rechazarUsuario(id){ if(!confirm('¿Rechazar esta cuenta?')) return; try{ await db.collection('users').doc(id).update({aprobado:false, estado:'rechazado', fechaRechazo:firebase.firestore.FieldValue.serverTimestamp()}); await cargarUsuariosAdmin(); }catch(err){ alert('Error: '+err.message); } }
     async function renovarSuscripcion(id){ if(!confirm('¿Renovar suscripción a 30 días?')) return; try{ await db.collection('users').doc(id).update({diasRestantes:30, fechaAprobacion:firebase.firestore.FieldValue.serverTimestamp()}); await cargarUsuariosAdmin(); alert('Suscripción renovada a 30 días'); }catch(err){ alert('Error: '+err.message); } }
     async function eliminarUsuario(id){ if(!confirm('⚠️ Eliminar usuario permanentemente. ¿Continuar?')) return; try{ await db.collection('users').doc(id).delete(); await cargarUsuariosAdmin(); }catch(err){ alert('Error: '+err.message); } }
-    auth.onAuthStateChanged(async user=>{ if(!user){ mostrarPantalla('login'); return; } try{ const docRef=db.collection('users').doc(user.uid); const doc=await docRef.get(); let esAdmin=false; if(doc.exists && doc.data().rol==='admin') esAdmin=true; else if(user.email===ADMIN_EMAIL && !doc.exists){ await docRef.set({email:user.email, fechaRegistro:firebase.firestore.FieldValue.serverTimestamp(), plan:'trial_30d', aprobado:true, estado:'aprobado', diasRestantes:30, rol:'admin'}); esAdmin=true; } if(esAdmin){ mostrarPantalla('admin'); await cargarUsuariosAdmin(); return; } if(!doc.exists){ await docRef.set({email:user.email, fechaRegistro:firebase.firestore.FieldValue.serverTimestamp(), plan:'trial_30d', aprobado:false, estado:'pendiente', diasRestantes:30}); mostrarPantalla('pending'); return; } const data=doc.data(); if(data.aprobado && data.estado==='aprobado'){ const fechaBase=(data.fechaAprobacion||data.fechaRegistro)?.toDate()||new Date(); const diasRestantes=Math.max(0,30-Math.floor((new Date()-fechaBase)/86400000)); document.getElementById('planStatus').innerHTML=diasRestantes>0?`✅ Plan activo: ${diasRestantes} día(s) restantes`:'⛔ Plan expirado'; mostrarPantalla('app'); }else if(data.estado==='rechazado'){ mostrarPantalla('login'); document.getElementById('authMessage').innerText='Cuenta rechazada por el administrador.'; await auth.signOut(); }else mostrarPantalla('pending'); }catch(err){ mostrarPantalla('login'); console.error(err); } });
+    
+    auth.onAuthStateChanged(async user => {
+        if (user) await verificarUsuario(user);
+        else mostrarPantalla('login');
+    });
+
     document.getElementById('loginBtn').onclick=async()=>{ const email=document.getElementById('email').value.trim(), pwd=document.getElementById('password').value; if(!email||!pwd){ document.getElementById('authMessage').innerText='Completa campos'; return; } try{ await auth.signInWithEmailAndPassword(email,pwd); document.getElementById('authMessage').innerText=''; }catch(err){ document.getElementById('authMessage').innerText='Error: '+err.message; } };
     document.getElementById('registerBtn').onclick=async()=>{ const email=document.getElementById('email').value.trim(), pwd=document.getElementById('password').value; if(!email||!pwd){ document.getElementById('authMessage').innerText='Completa campos'; return; } if(pwd.length<6){ document.getElementById('authMessage').innerText='Mínimo 6 caracteres'; return; } try{ await auth.createUserWithEmailAndPassword(email,pwd); document.getElementById('authMessage').innerText='✅ Registro exitoso. Espera aprobación.'; }catch(err){ document.getElementById('authMessage').innerText='Error: '+err.message; } };
     document.getElementById('forgotBtn').onclick=async()=>{ const email=document.getElementById('email').value.trim(); if(!email){ alert('Escribe tu correo'); return; } try{ await auth.sendPasswordResetEmail(email); alert('Correo de recuperación enviado'); }catch(err){ alert('Error: '+err.message); } };
     document.getElementById('logoutBtn').onclick=()=>auth.signOut();
-    document.getElementById('refreshPendingBtn').onclick=()=>{ if(auth.currentUser) auth.currentUser.reload().then(()=>auth.onAuthStateChanged(()=>{})); };
+    document.getElementById('refreshPendingBtn').onclick=()=>{ if(auth.currentUser) auth.currentUser.reload().then(()=>verificarUsuario(auth.currentUser)); };
     document.getElementById('recargarUsuariosBtn').onclick=()=>cargarUsuariosAdmin();
+    
     // Tabs admin
     document.querySelectorAll('.admin-tab').forEach(tab=>{ tab.onclick=()=>{ document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active'); const target=tab.dataset.tab; document.querySelectorAll('.tab-content').forEach(cont=>cont.classList.remove('active')); document.getElementById(`tab${target.charAt(0).toUpperCase()+target.slice(1)}`).classList.add('active'); }; });
 
@@ -491,7 +603,7 @@
     document.getElementById('compressBtnA').onclick=()=>comprimirPdf(compBufA,document.getElementById('statusCompressA'));
 
     function escapeHtml(str){ return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m; }); }
-    console.log("✅ App lista con WhatsApp y panel admin");
+    console.log("✅ App corregida: admin forzado para waroiapy@gmail.com");
 </script>
 </body>
 </html>
