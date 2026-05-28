@@ -56,27 +56,127 @@
         #perspCanvas { touch-action: none; cursor: crosshair; border-radius: 12px; max-width: 95vw; max-height: 65vh; display: block; }
         .persp-btns { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
         
-        /* MODAL CÁMARA */
+        /* MODAL CÁMARA MEJORADO - BOTONES FIJOS */
         #cameraModal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); z-index: 10000; flex-direction: column;
             align-items: center; justify-content: center;
         }
         #cameraModal.activo { display: flex; }
-        .camera-header { position: absolute; top: 20px; right: 20px; display: flex; gap: 12px; z-index: 10001; }
-        .camera-header button { background: rgba(0,0,0,0.6); color: white; border: none; padding: 8px 16px; border-radius: 40px; }
-        .video-container { position: relative; max-width: 95vw; max-height: 70vh; border-radius: 20px; overflow: hidden; }
-        #cameraVideo { width: 100%; height: auto; background: #000; }
-        #cameraOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .capture-btn-container { margin-top: 25px; text-align: center; }
-        .capture-btn { width: 80px; height: 80px; border-radius: 50%; background-color: #4caf50; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-        .capture-btn:active { transform: scale(0.92); }
-        .capture-btn::before { content: "📸"; font-size: 2.5rem; }
-        .camera-loading { color: white; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 40px; position: absolute; top: 20px; left: 20px; }
-        .preview-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20000; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
-        .preview-overlay.active { opacity: 1; pointer-events: auto; }
-        .preview-img { max-width: 90vw; max-height: 70vh; border-radius: 20px; }
-        .preview-text { color: white; margin-top: 20px; background: rgba(0,0,0,0.6); padding: 8px 24px; border-radius: 40px; }
+        .camera-header {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            left: auto;
+            display: flex;
+            gap: 12px;
+            z-index: 10001;
+            background: transparent;
+        }
+        .camera-header button {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .video-container {
+            position: relative;
+            max-width: 95vw;
+            max-height: 70vh;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        #cameraVideo {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #000;
+        }
+        #cameraOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .capture-btn-container {
+            margin-top: 25px;
+            text-align: center;
+            position: relative;
+            z-index: 10001;
+        }
+        .capture-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background-color: #4caf50;
+            border: 3px solid white;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .capture-btn:active {
+            transform: scale(0.92);
+            background-color: #388e3c;
+        }
+        .capture-btn::before {
+            content: "📸";
+            font-size: 2.5rem;
+        }
+        .camera-loading {
+            color: white;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 16px;
+            border-radius: 40px;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10001;
+            font-size: 0.9rem;
+            backdrop-filter: blur(4px);
+        }
+        .preview-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 20000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .preview-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .preview-img {
+            max-width: 90vw;
+            max-height: 70vh;
+            border-radius: 20px;
+        }
+        .preview-text {
+            color: white;
+            margin-top: 20px;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 24px;
+            border-radius: 40px;
+        }
         
         .img-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
         .queue-item { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
@@ -220,7 +320,7 @@
     </div>
 </div>
 
-<!-- MODALES (perspectiva, cámara, vista previa) -->
+<!-- MODALES -->
 <div id="perspModal">
     <h3>📐 Corrección de perspectiva</h3>
     <canvas id="perspCanvas"></canvas>
@@ -231,9 +331,11 @@
         <button id="perspCancelBtn" style="background:#dc2626;">✖ Cancelar</button>
     </div>
 </div>
+
 <div id="cameraModal">
     <div class="camera-header">
-        <button id="closeCameraBtn">Cerrar</button>
+        <button id="flashCameraBtn" class="flash-btn">⚡ Flash</button>
+        <button id="closeCameraBtn">✖ Cerrar</button>
     </div>
     <div class="camera-loading" id="cameraLoading">📷 Iniciando cámara...</div>
     <div class="video-container">
@@ -244,6 +346,7 @@
         <button id="capturePhotoBtn" class="capture-btn"></button>
     </div>
 </div>
+
 <div id="previewOverlay" class="preview-overlay">
     <img id="previewImage" class="preview-img">
     <div class="preview-text">✅ Foto añadida</div>
@@ -439,13 +542,144 @@
     function renderizarCola(queue,containerId){ const container=document.getElementById(containerId); if(queue.length===0){ container.innerHTML='🖼️ No hay imágenes'; return; } container.innerHTML=queue.map((img,idx)=>`<div class="queue-item"><img src="${img.dataUrl}" class="img-thumb"><div style="flex:1;">${escapeHtml(img.name)}</div><div class="queue-controls"><button class="btn-up" data-idx="${idx}" ${idx===0?'disabled':''}>▲</button><button class="btn-down" data-idx="${idx}" ${idx===queue.length-1?'disabled':''}>▼</button><button class="btn-remove" data-idx="${idx}" style="background:#dc2626;">✕</button></div></div>`).join('')+`<div>Total: ${queue.length}</div>`; container.querySelectorAll('.btn-up').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); if(i>0){ [queue[i-1],queue[i]]=[queue[i],queue[i-1]]; renderizarCola(queue,containerId); } }); container.querySelectorAll('.btn-down').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); if(i<queue.length-1){ [queue[i],queue[i+1]]=[queue[i+1],queue[i]]; renderizarCola(queue,containerId); } }); container.querySelectorAll('.btn-remove').forEach(btn=>btn.onclick=()=>{ const i=parseInt(btn.dataset.idx); const removed=queue.splice(i,1)[0]; if(removed && removed.dataUrl) URL.revokeObjectURL(removed.dataUrl); renderizarCola(queue,containerId); }); }
     async function convertirColaAPdf(queue,statusEl,previewContainerId){ if(queue.length===0){ alert('Agrega al menos una imagen'); return; } const{jsPDF}=window.jspdf; const pdf=new jsPDF({unit:'mm',format:[PAGE_WIDTH_MM,PAGE_HEIGHT_MM]}); for(let i=0;i<queue.length;i++){ statusEl.innerHTML=`<span class="spinner"></span> Imagen ${i+1} de ${queue.length}...`; const imgObj=queue[i]; if(!imgObj.element||!imgObj.element.naturalWidth){ statusEl.innerText='❌ Error'; return; } const dataUrlCorregida=await abrirPerspectiva(imgObj.element); if(dataUrlCorregida===null){ statusEl.innerText='❌ Cancelado'; return; } const img=new Image(); await new Promise((resolve,reject)=>{ img.onload=resolve; img.onerror=reject; img.src=dataUrlCorregida; }); if(i>0) pdf.addPage(); const ratio=Math.min(PAGE_WIDTH_MM/img.width, PAGE_HEIGHT_MM/img.height); const drawWidth=img.width*ratio, drawHeight=img.height*ratio; const x=(PAGE_WIDTH_MM-drawWidth)/2, y=(PAGE_HEIGHT_MM-drawHeight)/2; pdf.addImage(dataUrlCorregida,'JPEG',x,y,drawWidth,drawHeight); if(dataUrlCorregida!==imgObj.dataUrl && dataUrlCorregida.startsWith('blob:')) URL.revokeObjectURL(dataUrlCorregida); } agregarMarcaAgua(pdf); pdf.save(`scan_${Date.now()}.pdf`); statusEl.innerHTML=`✅ PDF de ${queue.length} páginas generado.`; revocarTodasLasUrls(queue); queue.length=0; renderizarCola(queue,previewContainerId); }
 
-    // ==================== CÁMARA ====================
-    async function iniciarCamara(queue,previewContainerId,statusId){ currentQueueTarget=queue; currentPreviewContainerId=previewContainerId; const modal=document.getElementById('cameraModal'); const video=document.getElementById('cameraVideo'); const loadingDiv=document.getElementById('cameraLoading'); modal.classList.add('activo'); loadingDiv.style.display='block'; try{ if(currentStream) currentStream.getTracks().forEach(t=>t.stop()); const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); currentStream=stream; video.srcObject=stream; await video.play(); loadingDiv.style.display='none'; await new Promise(resolve=>{ const check=setInterval(()=>{ if(video.videoWidth>0&&video.videoHeight>0&&video.readyState>=2){ clearInterval(check); resolve(); } },100); }); if(animationFrameId) cancelAnimationFrame(animationFrameId); function drawFrame(){ if(!video.videoWidth){ animationFrameId=requestAnimationFrame(drawFrame); return; } const overlay=document.getElementById('cameraOverlay'); const container=document.querySelector('.video-container'); const rect=container.getBoundingClientRect(); overlay.width=rect.width; overlay.height=rect.height; const ctxOverlay=overlay.getContext('2d'); ctxOverlay.clearRect(0,0,overlay.width,overlay.height); const marginX=overlay.width*0.1, marginY=overlay.height*0.15; const frameW=overlay.width-marginX*2, frameH=overlay.height-marginY*2; ctxOverlay.strokeStyle='#fff'; ctxOverlay.lineWidth=3; ctxOverlay.setLineDash([10,15]); ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); ctxOverlay.setLineDash([]); ctxOverlay.strokeStyle='#4caf50'; ctxOverlay.lineWidth=2; ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); const cornerLen=20; ctxOverlay.beginPath(); ctxOverlay.moveTo(marginX,marginY+cornerLen); ctxOverlay.lineTo(marginX,marginY); ctxOverlay.lineTo(marginX+cornerLen,marginY); ctxOverlay.moveTo(marginX+frameW-cornerLen,marginY); ctxOverlay.lineTo(marginX+frameW,marginY); ctxOverlay.lineTo(marginX+frameW,marginY+cornerLen); ctxOverlay.moveTo(marginX+frameW,marginY+frameH-cornerLen); ctxOverlay.lineTo(marginX+frameW,marginY+frameH); ctxOverlay.lineTo(marginX+frameW-cornerLen,marginY+frameH); ctxOverlay.moveTo(marginX+cornerLen,marginY+frameH); ctxOverlay.lineTo(marginX,marginY+frameH); ctxOverlay.lineTo(marginX,marginY+frameH-cornerLen); ctxOverlay.stroke(); animationFrameId=requestAnimationFrame(drawFrame); } drawFrame(); }catch(err){ loadingDiv.innerText='❌ Error cámara: '+err.message; } }
-    async function mostrarPreviewYCerrar(dataUrl){ return new Promise(resolve=>{ const overlay=document.getElementById('previewOverlay'); const previewImg=document.getElementById('previewImage'); previewImg.src=dataUrl; overlay.classList.add('active'); setTimeout(()=>{ overlay.classList.remove('active'); resolve(); },1500); }); }
-    async function capturarFoto(){ const video=document.getElementById('cameraVideo'); if(!video.videoWidth||video.videoWidth===0){ alert('Cámara no lista'); return; } screenFlash(); playShutterSound(); const doCapture=()=>{ const canvas=document.createElement('canvas'); canvas.width=video.videoWidth; canvas.height=video.videoHeight; const ctx=canvas.getContext('2d',{willReadFrequently:true}); ctx.drawImage(video,0,0,canvas.width,canvas.height); canvas.toBlob(async blob=>{ if(blob){ const dataUrl=URL.createObjectURL(blob); await mostrarPreviewYCerrar(dataUrl); const file=new File([blob],`foto_${Date.now()}.jpg`,{type:'image/jpeg'}); agregarImagen(file,currentQueueTarget,currentPreviewContainerId); URL.revokeObjectURL(dataUrl); }else alert('Error al capturar'); },'image/jpeg',0.92); }; if('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(()=>doCapture()); else setTimeout(doCapture,150); }
-    function cerrarCamara(){ const modal=document.getElementById('cameraModal'); modal.classList.remove('activo'); if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream=null; } document.getElementById('cameraVideo').srcObject=null; if(animationFrameId) cancelAnimationFrame(animationFrameId); const overlay=document.getElementById('cameraOverlay'); const ctxOverlay=overlay.getContext('2d'); ctxOverlay.clearRect(0,0,overlay.width,overlay.height); }
-    document.getElementById('closeCameraBtn').onclick=cerrarCamara;
-    document.getElementById('capturePhotoBtn').onclick=capturarFoto;
+    // ==================== CÁMARA CORREGIDA ====================
+    async function iniciarCamara(queue,previewContainerId,statusId){ 
+        currentQueueTarget=queue; 
+        currentPreviewContainerId=previewContainerId; 
+        const modal=document.getElementById('cameraModal'); 
+        const video=document.getElementById('cameraVideo'); 
+        const loadingDiv=document.getElementById('cameraLoading'); 
+        modal.classList.add('activo'); 
+        loadingDiv.style.display='block'; 
+        try{ 
+            if(currentStream) currentStream.getTracks().forEach(t=>t.stop()); 
+            const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); 
+            currentStream=stream; 
+            video.srcObject=stream; 
+            await video.play(); 
+            loadingDiv.style.display='none'; 
+            await new Promise(resolve=>{ 
+                const check=setInterval(()=>{ 
+                    if(video.videoWidth>0&&video.videoHeight>0&&video.readyState>=2){ 
+                        clearInterval(check); 
+                        resolve(); 
+                    } 
+                },100); 
+            }); 
+            if(animationFrameId) cancelAnimationFrame(animationFrameId); 
+            function drawFrame(){ 
+                if(!video.videoWidth){ 
+                    animationFrameId=requestAnimationFrame(drawFrame); 
+                    return; 
+                } 
+                const overlay=document.getElementById('cameraOverlay'); 
+                const container=document.querySelector('.video-container'); 
+                const rect=container.getBoundingClientRect(); 
+                overlay.width=rect.width; 
+                overlay.height=rect.height; 
+                const ctxOverlay=overlay.getContext('2d'); 
+                ctxOverlay.clearRect(0,0,overlay.width,overlay.height); 
+                const marginX=overlay.width*0.1, marginY=overlay.height*0.15; 
+                const frameW=overlay.width-marginX*2, frameH=overlay.height-marginY*2; 
+                ctxOverlay.strokeStyle='#fff'; 
+                ctxOverlay.lineWidth=3; 
+                ctxOverlay.setLineDash([10,15]); 
+                ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); 
+                ctxOverlay.setLineDash([]); 
+                ctxOverlay.strokeStyle='#4caf50'; 
+                ctxOverlay.lineWidth=2; 
+                ctxOverlay.strokeRect(marginX,marginY,frameW,frameH); 
+                const cornerLen=20; 
+                ctxOverlay.beginPath(); 
+                ctxOverlay.moveTo(marginX,marginY+cornerLen); 
+                ctxOverlay.lineTo(marginX,marginY); 
+                ctxOverlay.lineTo(marginX+cornerLen,marginY); 
+                ctxOverlay.moveTo(marginX+frameW-cornerLen,marginY); 
+                ctxOverlay.lineTo(marginX+frameW,marginY); 
+                ctxOverlay.lineTo(marginX+frameW,marginY+cornerLen); 
+                ctxOverlay.moveTo(marginX+frameW,marginY+frameH-cornerLen); 
+                ctxOverlay.lineTo(marginX+frameW,marginY+frameH); 
+                ctxOverlay.lineTo(marginX+frameW-cornerLen,marginY+frameH); 
+                ctxOverlay.moveTo(marginX+cornerLen,marginY+frameH); 
+                ctxOverlay.lineTo(marginX,marginY+frameH); 
+                ctxOverlay.lineTo(marginX,marginY+frameH-cornerLen); 
+                ctxOverlay.stroke(); 
+                animationFrameId=requestAnimationFrame(drawFrame); 
+            } 
+            drawFrame(); 
+        }catch(err){ 
+            loadingDiv.innerText='❌ Error cámara: '+err.message; 
+        } 
+    }
+
+    async function mostrarPreviewYCerrar(dataUrl){ 
+        return new Promise(resolve=>{ 
+            const overlay=document.getElementById('previewOverlay'); 
+            const previewImg=document.getElementById('previewImage'); 
+            previewImg.src=dataUrl; 
+            overlay.classList.add('active'); 
+            setTimeout(()=>{ 
+                overlay.classList.remove('active'); 
+                resolve(); 
+            },1500); 
+        }); 
+    }
+
+    async function capturarFoto(){ 
+        const video=document.getElementById('cameraVideo'); 
+        if(!video.videoWidth||video.videoWidth===0){ 
+            alert('Cámara no lista'); 
+            return; 
+        } 
+        screenFlash(); 
+        playShutterSound(); 
+        const doCapture=()=>{ 
+            const canvas=document.createElement('canvas'); 
+            canvas.width=video.videoWidth; 
+            canvas.height=video.videoHeight; 
+            const ctx=canvas.getContext('2d',{willReadFrequently:true}); 
+            ctx.drawImage(video,0,0,canvas.width,canvas.height); 
+            canvas.toBlob(async blob=>{ 
+                if(blob){ 
+                    const dataUrl=URL.createObjectURL(blob); 
+                    await mostrarPreviewYCerrar(dataUrl); 
+                    const file=new File([blob],`foto_${Date.now()}.jpg`,{type:'image/jpeg'}); 
+                    agregarImagen(file,currentQueueTarget,currentPreviewContainerId); 
+                    URL.revokeObjectURL(dataUrl); 
+                }else alert('Error al capturar'); 
+            },'image/jpeg',0.92); 
+        }; 
+        if('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(()=>doCapture()); 
+        else setTimeout(doCapture,150); 
+    }
+
+    function cerrarCamara(){ 
+        const modal=document.getElementById('cameraModal'); 
+        modal.classList.remove('activo'); 
+        if(currentStream){ 
+            currentStream.getTracks().forEach(t=>t.stop()); 
+            currentStream=null; 
+        } 
+        document.getElementById('cameraVideo').srcObject=null; 
+        if(animationFrameId) cancelAnimationFrame(animationFrameId); 
+        const overlay=document.getElementById('cameraOverlay'); 
+        const ctxOverlay=overlay.getContext('2d'); 
+        ctxOverlay.clearRect(0,0,overlay.width,overlay.height); 
+    }
+
+    // Botón flash: activa un flash de pantalla (efecto de luz) al presionarlo, útil en oscuridad
+    function flashPantallaManual() {
+        screenFlash();
+        // Pequeño feedback táctil
+        const btn = document.getElementById('flashCameraBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✨ Flash!';
+        setTimeout(() => { btn.innerHTML = originalText; }, 500);
+    }
+
+    document.getElementById('closeCameraBtn').onclick = cerrarCamara;
+    document.getElementById('capturePhotoBtn').onclick = capturarFoto;
+    document.getElementById('flashCameraBtn').onclick = flashPantallaManual;
 
     // ==================== AUTENTICACIÓN Y ADMIN ====================
     function mostrarPantalla(tipo){ 
@@ -528,12 +762,12 @@
             const pendientes = [], aprobados = [], rechazados = [];
             snapshot.forEach(doc => {
                 const d = { ...doc.data(), id: doc.id };
-                if (d.rol === 'admin') return; // no mostrar al admin principal
+                if (d.rol === 'admin') return;
                 const estado = (d.estado || 'pendiente').toLowerCase();
                 if (estado === 'pendiente') pendientes.push(d);
                 else if (estado === 'aprobado') aprobados.push(d);
                 else if (estado === 'rechazado') rechazados.push(d);
-                else pendientes.push(d); // fallback
+                else pendientes.push(d);
             });
             const render = (containerId, usuarios, showActions) => {
                 const container = document.getElementById(containerId);
@@ -701,7 +935,7 @@
     document.getElementById('compressBtnA').onclick = () => comprimirPdf(compBufA, document.getElementById('statusCompressA'));
 
     function escapeHtml(str) { return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m] || m)); }
-    console.log("✅ App corregida con diseño original, admin forzado y lista de usuarios.");
+    console.log("✅ App corregida: botón cerrar fijo, flash manual añadido.");
 </script>
 </body>
 </html>
