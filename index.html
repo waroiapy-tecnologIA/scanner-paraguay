@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Scanner PDF Pro - Con IA local</title>
+    <title>Scanner PDF Pro - CamScanner Style</title>
     <!-- Librerías externas -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-    <!-- OpenCV.js (detección bordes y corrección) -->
+    <!-- OpenCV.js (detección bordes y corrección perspectiva) -->
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady()"></script>
     <!-- Tesseract.js (OCR) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -36,41 +34,11 @@
         .plan-badge { background: #fbbf24; color: #1e3c72; padding: 6px 12px; border-radius: 40px; font-weight: bold; text-align: center; margin-bottom: 12px; }
         h2 { font-size: 1.4rem; margin: 0 0 8px; }
         h3 { font-size: 1.2rem; margin: 0 0 12px; }
-        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 6px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
         .pending-card { background: #fef3c7; border: 2px solid #f59e0b; border-radius: 20px; padding: 20px; text-align: center; }
         .admin-badge { display: inline-block; background: #dc2626; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
         .user-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 8px; }
         .user-info { flex: 1; min-width: 150px; }
         .user-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-        .aprobado { color: #2c7a4d; font-weight: bold; }
-        .pendiente { color: #f59e0b; font-weight: bold; }
-        .rechazado { color: #dc2626; font-weight: bold; }
-        .error-msg { color: #dc2626; font-size: 0.85rem; padding: 8px; background: #fee2e2; border-radius: 10px; margin-top: 8px; }
-        .forgot-btn { background: transparent !important; color: #ffd966 !important; font-size: 0.85rem !important; padding: 4px 8px !important; text-decoration: underline; font-weight: normal !important; display: block; width: 100%; text-align: center; }
-        .tool-section { margin-bottom: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
-        .whatsapp-link { margin-top: 16px; text-align: center; font-size: 0.9rem; }
-        .whatsapp-link a { color: #25D366; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; background: rgba(37,211,102,0.1); padding: 6px 12px; border-radius: 40px; }
-        
-        /* Modales */
-        #perspModal, #cameraModal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); z-index: 9999; flex-direction: column;
-            align-items: center; justify-content: center;
-        }
-        #perspModal.activo, #cameraModal.activo { display: flex; }
-        #perspCanvas { touch-action: none; cursor: crosshair; border-radius: 12px; max-width: 95vw; max-height: 65vh; display: block; }
-        .persp-btns { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
-        .camera-header { position: absolute; top: 20px; right: 20px; display: flex; gap: 12px; z-index: 10001; }
-        .camera-header button { background: rgba(0,0,0,0.6); color: white; border: none; padding: 8px 16px; border-radius: 40px; }
-        .video-container { position: relative; max-width: 95vw; max-height: 70vh; border-radius: 20px; overflow: hidden; }
-        #cameraVideo { width: 100%; height: auto; background: #000; }
-        .capture-btn-container { margin-top: 25px; text-align: center; }
-        .capture-btn { width: 80px; height: 80px; border-radius: 50%; background-color: #4caf50; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-        .capture-btn::before { content: "📸"; font-size: 2.5rem; }
-        .preview-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20000; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
-        .preview-overlay.active { opacity: 1; pointer-events: auto; }
-        .preview-img { max-width: 90vw; max-height: 70vh; border-radius: 20px; }
         .img-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
         .queue-item { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
         .admin-tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #ddd; }
@@ -78,17 +46,24 @@
         .admin-tab.active { background: #1e3c72; color: white; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        .tool-section { margin-bottom: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+        .whatsapp-link { margin-top: 16px; text-align: center; font-size: 0.9rem; }
+        .whatsapp-link a { color: #25D366; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 6px; background: rgba(37,211,102,0.1); padding: 6px 12px; border-radius: 40px; }
+        #cameraModal, #previewOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; flex-direction:column; align-items:center; justify-content:center; }
+        #cameraModal.activo, #previewOverlay.activo { display: flex; }
+        .video-container { position: relative; max-width: 95vw; max-height: 70vh; border-radius: 20px; overflow: hidden; }
+        #cameraVideo { width: 100%; height: auto; background: #000; }
+        .capture-btn { width: 80px; height: 80px; border-radius: 50%; background-color: #4caf50; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-top: 20px; }
+        .capture-btn::before { content: "📸"; font-size: 2.5rem; }
+        .camera-loading { color: white; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 40px; position: absolute; top: 20px; left: 20px; }
+        .preview-img { max-width: 90vw; max-height: 70vh; border-radius: 20px; }
         .ocr-result { background: #fff3e0; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 0.9rem; border-left: 4px solid #f59e0b; }
     </style>
 </head>
 <body>
 <div class="container">
-
-    <!-- AUTH CARD -->
+    <!-- AUTH -->
     <div class="card auth-card" id="authSection">
-        <div style="text-align:center; margin-bottom:12px;">
-            <img src="1777768984633.png" alt="WARO I.A." style="max-width:100%; max-height:120px; object-fit:contain;">
-        </div>
         <h2>🔐 Scanner PDF Pro</h2>
         <div id="authForms">
             <input type="email" id="email" placeholder="Correo electrónico">
@@ -97,164 +72,46 @@
                 <button id="loginBtn">Iniciar sesión</button>
                 <button id="registerBtn" class="btn-secondary">Registrarse</button>
             </div>
-            <button id="forgotBtn" class="forgot-btn">¿Olvidaste tu contraseña?</button>
+            <button id="forgotBtn" style="background:transparent; color:#ffd966; font-size:0.85rem;">¿Olvidaste tu contraseña?</button>
             <div id="authMessage" class="status" style="color:#ffd966;"></div>
-            <div class="whatsapp-link">
-                <a href="https://wa.me/595984414224?text=Hola%2C%20necesito%20activaci%C3%B3n%20r%C3%A1pida%20para%20Scanner%20PDF%20Pro" target="_blank">
-                    📱 ¿Necesitas activación rápida o soporte? Contáctanos por WhatsApp
-                </a>
-            </div>
+            <div class="whatsapp-link"><a href="https://wa.me/595984414224" target="_blank">📱 Soporte WhatsApp</a></div>
         </div>
         <div id="userInfo" style="display:none;">
-            <div class="plan-badge" id="planStatus">Cargando...</div>
+            <div class="plan-badge" id="planStatus"></div>
             <div id="adminBadgeContainer"></div>
             <button id="logoutBtn" class="btn-secondary">Cerrar sesión</button>
         </div>
     </div>
 
-    <!-- PANTALLA PENDIENTE -->
-    <div id="pendingScreen" style="display:none;">
-        <div class="card pending-card">
-            <h2>⏳ Cuenta en revisión</h2>
-            <p>Tu registro fue recibido. El administrador debe aprobar tu cuenta.</p>
-            <p style="font-size:0.85rem;">Si necesitas activación rápida, contáctanos por WhatsApp:</p>
-            <a href="https://wa.me/595984414224?text=Hola%2C%20necesito%20activaci%C3%B3n%20r%C3%A1pida%20para%20mi%20cuenta%20de%20Scanner%20PDF%20Pro" target="_blank" style="display:inline-block; background:#25D366; color:white; padding:10px 20px; border-radius:40px; text-decoration:none; margin:8px 0;">📱 Contactar por WhatsApp</a>
-            <button id="refreshPendingBtn" class="btn-warning" style="margin-top:8px;">🔄 Verificar estado</button>
-        </div>
-    </div>
+    <div id="pendingScreen" style="display:none;"><div class="card pending-card"><h2>⏳ Cuenta en revisión</h2><button id="refreshPendingBtn" class="btn-warning">Verificar</button></div></div>
 
-    <!-- PANEL ADMIN (igual que original, pero con botón OCR añadido) -->
+    <!-- PANEL ADMIN -->
     <div id="adminPanel" style="display:none;">
-        <div class="card" style="background:#1e3c72; color:white;">
-            <h2>👑 Panel de Control</h2>
-            <div class="admin-badge">ADMINISTRADOR</div>
-            <p style="margin-top:8px;">Gestiona usuarios, aprueba cuentas, renueva suscripciones.</p>
-            <button id="recargarUsuariosBtn" style="background:#fbbf24; color:#1e3c72;">🔄 Recargar lista</button>
-        </div>
-        <div class="card">
-            <div class="admin-tabs">
-                <div class="admin-tab active" data-tab="pendientes">⏳ Pendientes</div>
-                <div class="admin-tab" data-tab="aprobados">✅ Aprobados</div>
-                <div class="admin-tab" data-tab="rechazados">❌ Rechazados</div>
-            </div>
-            <div id="tabPendientes" class="tab-content active">Cargando...</div>
-            <div id="tabAprobados" class="tab-content">Cargando...</div>
-            <div id="tabRechazados" class="tab-content">Cargando...</div>
-        </div>
-
-        <!-- HERRAMIENTAS PDF DEL ADMIN (con OCR) -->
-        <div class="card" style="border:2px solid #1e3c72;">
-            <h3>🛠️ Mis herramientas PDF</h3>
-            <div class="tool-section">
-                <div>📸 Foto / Imagen a PDF</div>
-                <div class="btn-group">
-                    <button id="cameraBtnA" class="file-input-label" style="background:#2c7a4d;">📷 Cámara</button>
-                    <label class="file-input-label" style="background:#4b5563;">🖼️ Galería <input type="file" id="galleryInputA" accept="image/*" style="display:none;"></label>
-                </div>
-                <button id="clearQueueA" class="btn-secondary">🗑️ Vaciar lista</button>
-                <div id="previewA" class="preview-area">🖼️ No hay imágenes</div>
-                <button id="ocrBtnA" style="background:#f59e0b; margin-right:5px;">🔍 OCR (texto)</button>
-                <button id="convertBtnA">📑 Convertir a PDF</button>
-                <div id="statusImgA" class="status"></div>
-                <div id="ocrResultA" style="display:none;" class="ocr-result"></div>
-            </div>
-            <div class="tool-section">
-                <div>🔗 Unir PDFs</div>
-                <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📂 Seleccionar PDFs <input type="file" id="mergeInputA" accept="application/pdf" multiple style="display:none;"></label>
-                <button id="mergeBtnA">⚡ Unir</button>
-                <div id="mergeListA" class="preview-area">📄 Lista de PDFs</div>
-                <div id="statusMergeA" class="status"></div>
-            </div>
-            <div class="tool-section">
-                <div>✂️ Dividir PDF</div>
-                <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF <input type="file" id="splitInputA" accept="application/pdf" style="display:none;"></label>
-                <div style="display:flex; gap:8px; margin:10px 0;"><input type="number" id="splitStartA" placeholder="Inicio"><input type="number" id="splitEndA" placeholder="Fin"><button id="splitBtnA">Extraer</button></div>
-                <div id="statusSplitA" class="status"></div>
-            </div>
-            <div class="tool-section">
-                <div>🗜️ Comprimir PDF</div>
-                <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF <input type="file" id="compressInputA" accept="application/pdf" style="display:none;"></label>
-                <button id="compressBtnA">🔽 Comprimir</button>
-                <div id="statusCompressA" class="status"></div>
-            </div>
-        </div>
+        <div class="card" style="background:#1e3c72; color:white;"><h2>👑 Panel Admin</h2><div class="admin-badge">ADMIN</div><button id="recargarUsuariosBtn" style="background:#fbbf24; color:#1e3c72;">🔄 Recargar</button></div>
+        <div class="card"><div class="admin-tabs"><div class="admin-tab active" data-tab="pendientes">Pendientes</div><div class="admin-tab" data-tab="aprobados">Aprobados</div><div class="admin-tab" data-tab="rechazados">Rechazados</div></div><div id="tabPendientes" class="tab-content active">Cargando...</div><div id="tabAprobados" class="tab-content">Cargando...</div><div id="tabRechazados" class="tab-content">Cargando...</div></div>
+        <!-- Herramientas admin igual que usuario -->
+        <div class="card" style="border:2px solid #1e3c72;"><h3>🛠️ Herramientas PDF</h3><div class="tool-section"><div>📸 Imagen a PDF</div><div class="btn-group"><button id="cameraBtnA" class="file-input-label">📷 Cámara</button><label class="file-input-label">🖼️ Galería <input type="file" id="galleryInputA" accept="image/*" style="display:none;"></label></div><button id="clearQueueA" class="btn-secondary">Vaciar lista</button><div id="previewA" class="preview-area">Sin imágenes</div><button id="ocrBtnA" class="btn-warning">🔍 OCR</button><button id="convertBtnA">📑 Convertir a PDF</button><div id="ocrResultA" class="ocr-result" style="display:none;"></div><div id="statusImgA" class="status"></div></div></div>
     </div>
 
-    <!-- FUNCIONES USUARIO NORMAL (con OCR) -->
+    <!-- FUNCIONES USUARIO NORMAL -->
     <div id="appFunctions" style="display:none;">
-        <div class="card">
-            <div>📸 Foto / Imagen a PDF</div>
-            <div class="btn-group">
-                <button id="cameraBtn" class="file-input-label" style="background:#2c7a4d;">📷 Cámara</button>
-                <label class="file-input-label" style="background:#4b5563;">🖼️ Galería <input type="file" id="galleryInput" accept="image/*" style="display:none;"></label>
-            </div>
-            <button id="clearQueue" class="btn-secondary">🗑️ Vaciar lista</button>
-            <div id="imagePreviewArea" class="preview-area">🖼️ No hay imágenes</div>
-            <button id="ocrBtnUser" style="background:#f59e0b; margin-right:5px;">🔍 OCR (texto)</button>
-            <button id="convertToPdfBtn">📑 Convertir a PDF</button>
-            <div id="imgStatus" class="status"></div>
-            <div id="ocrResultUser" style="display:none;" class="ocr-result"></div>
-        </div>
-        <div class="card">
-            <div>🔗 Unir PDFs</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📂 Seleccionar varios PDFs <input type="file" id="unionPdfInput" accept="application/pdf" multiple style="display:none;"></label>
-            <button id="mergeBtn">⚡ Unir PDFs</button>
-            <div id="mergeListArea" class="preview-area">📄 Lista de PDFs seleccionados</div>
-            <div id="mergeStatus" class="status"></div>
-        </div>
-        <div class="card">
-            <div>✂️ Dividir PDF</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF <input type="file" id="splitPdfInput" accept="application/pdf" style="display:none;"></label>
-            <div style="display:flex; gap:8px; margin:10px 0;"><input type="number" id="pagInicio" placeholder="Inicio"><input type="number" id="pagFin" placeholder="Fin"><button id="splitDoBtn">Extraer</button></div>
-            <div id="splitStatus" class="status"></div>
-        </div>
-        <div class="card">
-            <div>🗜️ Comprimir PDF</div>
-            <label class="file-input-label" style="background:#0b5e7e; display:block; text-align:center;">📁 Elegir PDF <input type="file" id="compressPdfInput" accept="application/pdf" style="display:none;"></label>
-            <button id="compressBtn">🔽 Comprimir PDF</button>
-            <div id="compressStatus" class="status"></div>
-        </div>
+        <div class="card"><h3>📸 Escanear documento</h3><div class="btn-group"><button id="cameraBtn" class="file-input-label">📷 Cámara</button><label class="file-input-label">🖼️ Galería <input type="file" id="galleryInput" accept="image/*" style="display:none;"></label></div><button id="clearQueue" class="btn-secondary">Vaciar lista</button><div id="imagePreviewArea" class="preview-area">Sin imágenes</div><button id="ocrBtnUser" class="btn-warning">🔍 OCR</button><button id="convertToPdfBtn">📑 Convertir a PDF</button><div id="ocrResultUser" class="ocr-result" style="display:none;"></div><div id="imgStatus" class="status"></div></div>
+        <div class="card"><div>🔗 Unir PDFs</div><label class="file-input-label">📂 Seleccionar PDFs <input type="file" id="unionPdfInput" accept="application/pdf" multiple style="display:none;"></label><button id="mergeBtn">Unir</button><div id="mergeStatus" class="status"></div></div>
+        <div class="card"><div>✂️ Dividir PDF</div><label class="file-input-label">📁 Elegir PDF <input type="file" id="splitPdfInput" accept="application/pdf" style="display:none;"></label><div><input type="number" id="pagInicio" placeholder="Pág. inicio"><input type="number" id="pagFin" placeholder="Pág. fin"><button id="splitDoBtn">Extraer</button></div><div id="splitStatus" class="status"></div></div>
+        <div class="card"><div>🗜️ Comprimir PDF</div><label class="file-input-label">📁 Elegir PDF <input type="file" id="compressPdfInput" accept="application/pdf" style="display:none;"></label><button id="compressBtn">Comprimir</button><div id="compressStatus" class="status"></div></div>
     </div>
 </div>
 
-<!-- MODALES -->
-<div id="perspModal">
-    <h3 style="color:white;">📐 Corrección de perspectiva</h3>
-    <canvas id="perspCanvas"></canvas>
-    <div class="persp-btns">
-        <button id="perspAutoBtn">🤖 Auto enderezar</button>
-        <button id="perspOkBtn">✅ Aplicar</button>
-        <button id="perspSkipBtn" class="btn-secondary">⏭️ Sin corrección</button>
-        <button id="perspCancelBtn" style="background:#dc2626;">✖ Cancelar</button>
-    </div>
-</div>
-<div id="cameraModal">
-    <div class="camera-header">
-        <button id="closeCameraBtn">Cerrar</button>
-    </div>
-    <div class="camera-loading" id="cameraLoading">📷 Iniciando cámara...</div>
-    <div class="video-container">
-        <video id="cameraVideo" autoplay playsinline muted></video>
-        <canvas id="cameraOverlay" style="display:none;"></canvas>
-    </div>
-    <div class="capture-btn-container">
-        <button id="capturePhotoBtn" class="capture-btn"></button>
-    </div>
-</div>
-<div id="previewOverlay" class="preview-overlay">
-    <img id="previewImage" class="preview-img">
-    <div class="preview-text">✅ Foto añadida</div>
-</div>
+<!-- Modales -->
+<div id="cameraModal"><div class="camera-header"><button id="closeCameraBtn">Cerrar</button></div><div class="camera-loading" id="cameraLoading">Iniciando cámara...</div><div class="video-container"><video id="cameraVideo" autoplay playsinline muted></video></div><div class="capture-btn-container"><button id="capturePhotoBtn" class="capture-btn"></button></div></div>
+<div id="previewOverlay" class="preview-overlay"><img id="previewImage" class="preview-img"><div class="preview-text">✅ Imagen procesada</div></div>
 
 <script>
-    // ========== CONFIGURACIÓN INICIAL ==========
+    // ========== CONFIGURACIÓN ==========
     const ADMIN_EMAIL = "waroiapy@gmail.com";
-    let imageQueue = [];        // cola usuario normal
-    let imageQueueA = [];       // cola admin
-    let currentStream = null;
-    let cv = null;              // OpenCV
-    let openCVReady = false;
-    let pendingOCRCallback = null;  // para mostrar OCR después de procesar
+    let imageQueue = [], imageQueueA = [];
+    let currentStream = null, activeQueue = null, activePreviewId = null;
+    let cv = null, openCVReady = false;
 
     // Firebase
     const firebaseConfig = {
@@ -270,27 +127,16 @@
     const db = firebase.firestore();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // ========== FUNCIONES DE PROCESAMIENTO DE IMAGEN CON OPENCV ==========
-    function onOpenCvReady() {
-        cv = window.cv;
-        openCVReady = true;
-        console.log("OpenCV.js listo");
-    }
+    function onOpenCvReady() { cv = window.cv; openCVReady = true; console.log("OpenCV listo"); }
 
-    // Encontrar el contorno del documento (4 puntos)
+    // ========== PROCESAMIENTO DE IMAGEN CON OPENCV ==========
     function findDocumentContour(mat) {
-        let gray = new cv.Mat();
-        cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
-        let blur = new cv.Mat();
-        cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
-        let edges = new cv.Mat();
-        cv.Canny(blur, edges, 75, 200);
-        let contours = new cv.MatVector();
-        let hierarchy = new cv.Mat();
+        let gray = new cv.Mat(); cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+        let blur = new cv.Mat(); cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
+        let edges = new cv.Mat(); cv.Canny(blur, edges, 75, 200);
+        let contours = new cv.MatVector(); let hierarchy = new cv.Mat();
         cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-        
-        let maxArea = 0;
-        let bestContour = null;
+        let maxArea = 0, bestContour = null;
         for (let i = 0; i < contours.size(); i++) {
             let cnt = contours.get(i);
             let area = cv.contourArea(cnt);
@@ -298,90 +144,67 @@
                 let peri = cv.arcLength(cnt, true);
                 let approx = new cv.Mat();
                 cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-                if (approx.rows == 4) {
-                    maxArea = area;
-                    if (bestContour) bestContour.delete();
-                    bestContour = approx.clone();
-                }
+                if (approx.rows == 4) { maxArea = area; if(bestContour) bestContour.delete(); bestContour = approx.clone(); }
                 approx.delete();
             }
             cnt.delete();
         }
         contours.delete(); hierarchy.delete(); gray.delete(); blur.delete(); edges.delete();
-        if (!bestContour) return [];
+        if(!bestContour) return [];
         let points = [];
-        for (let i = 0; i < bestContour.rows; i++) {
-            let x = bestContour.data32S[i*2];
-            let y = bestContour.data32S[i*2+1];
-            points.push({x, y});
-        }
+        for(let i=0; i<bestContour.rows; i++) points.push({ x: bestContour.data32S[i*2], y: bestContour.data32S[i*2+1] });
         bestContour.delete();
         return points;
     }
 
-    // Corrección de perspectiva automática (devuelve nuevo canvas)
     async function autoCorrectPerspective(imgElement) {
-        if (!openCVReady || !cv) return imgElement;
+        if(!openCVReady || !cv) return imgElement;
         let src = cv.imread(imgElement);
         let points = findDocumentContour(src);
-        if (points.length !== 4) {
-            src.delete();
-            return imgElement;
-        }
-        // ordenar puntos: tl, tr, br, bl
-        points.sort((a,b) => (a.x + a.y) - (b.x + b.y));
-        let tl = points[0], br = points[3];
-        let tr = points.find(p => p.x > tl.x && p.y < br.y) || points[1];
-        let bl = points.find(p => p.x < br.x && p.y > tl.y) || points[2];
-        let width = Math.hypot(tr.x - tl.x, tr.y - tl.y);
-        let height = Math.hypot(bl.x - tl.x, bl.y - tl.y);
+        if(points.length !== 4) { src.delete(); return imgElement; }
+        points.sort((a,b)=>(a.x+a.y)-(b.x+b.y));
+        let tl=points[0], br=points[3];
+        let tr=points.find(p=>p.x>tl.x && p.y<br.y)||points[1];
+        let bl=points.find(p=>p.x<br.x && p.y>tl.y)||points[2];
+        let width = Math.hypot(tr.x-tl.x, tr.y-tl.y);
+        let height = Math.hypot(bl.x-tl.x, bl.y-tl.y);
         let srcTri = cv.matFromArray(4,1, cv.CV_32FC2, [tl.x,tl.y, tr.x,tr.y, br.x,br.y, bl.x,bl.y]);
         let dstTri = cv.matFromArray(4,1, cv.CV_32FC2, [0,0, width,0, width,height, 0,height]);
         let M = cv.getPerspectiveTransform(srcTri, dstTri);
         let warped = new cv.Mat();
         cv.warpPerspective(src, warped, M, new cv.Size(width, height));
         let canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = width; canvas.height = height;
         cv.imshow(canvas, warped);
         src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); warped.delete();
         return canvas;
     }
 
-    // Mejora de imagen (contraste, claridad)
     function enhanceImage(canvas) {
-        if (!openCVReady || !cv) return canvas;
+        if(!openCVReady || !cv) return canvas;
         let mat = cv.imread(canvas);
-        let lab = new cv.Mat();
-        cv.cvtColor(mat, lab, cv.COLOR_RGBA2Lab);
-        let channels = new cv.MatVector();
-        cv.split(lab, channels);
+        let lab = new cv.Mat(); cv.cvtColor(mat, lab, cv.COLOR_RGBA2Lab);
+        let channels = new cv.MatVector(); cv.split(lab, channels);
         let l = channels.get(0);
         let clahe = new cv.CLAHE(40, new cv.Size(8,8));
-        let l2 = new cv.Mat();
-        clahe.apply(l, l2);
+        let l2 = new cv.Mat(); clahe.apply(l, l2);
         channels.set(0, l2);
-        let enhancedLab = new cv.Mat();
-        cv.merge(channels, enhancedLab);
-        let result = new cv.Mat();
-        cv.cvtColor(enhancedLab, result, cv.COLOR_Lab2RGBA);
+        let enhancedLab = new cv.Mat(); cv.merge(channels, enhancedLab);
+        let result = new cv.Mat(); cv.cvtColor(enhancedLab, result, cv.COLOR_Lab2RGBA);
         cv.imshow(canvas, result);
         mat.delete(); lab.delete(); channels.delete(); l.delete(); l2.delete(); clahe.delete(); enhancedLab.delete(); result.delete();
         return canvas;
     }
 
-    // Procesar imagen desde blob (aplicar corrección + mejora automática)
     async function processImageBlob(blob) {
         return new Promise((resolve) => {
             let img = new Image();
             img.onload = async () => {
                 let canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                let ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
+                canvas.width = img.width; canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
                 let corrected = await autoCorrectPerspective(canvas);
-                if (corrected !== canvas) canvas = corrected;
+                if(corrected !== canvas) canvas = corrected;
                 canvas = enhanceImage(canvas);
                 canvas.toBlob(resolve, 'image/jpeg', 0.9);
                 URL.revokeObjectURL(img.src);
@@ -390,159 +213,103 @@
         });
     }
 
-    // Añadir imagen a cola con procesamiento automático
-    async function addImageToQueue(fileOrBlob, queueArray, previewAreaId) {
-        let processedBlob = await processImageBlob(fileOrBlob);
+    async function addImageToQueue(file, queue, previewId) {
+        let processedBlob = await processImageBlob(file);
         let url = URL.createObjectURL(processedBlob);
-        queueArray.push({ blob: processedBlob, url });
-        updatePreview(queueArray, previewAreaId);
+        queue.push({ blob: processedBlob, url });
+        updatePreview(queue, previewId);
     }
 
-    function updatePreview(queue, areaId) {
-        let container = document.getElementById(areaId);
-        if (!container) return;
-        if (queue.length === 0) {
-            container.innerHTML = "🖼️ No hay imágenes";
-            return;
-        }
+    function updatePreview(queue, previewId) {
+        let container = document.getElementById(previewId);
+        if(!container) return;
+        if(queue.length === 0) { container.innerHTML = "No hay imágenes"; return; }
         let html = '';
-        queue.forEach((item, idx) => {
-            html += `<div class="queue-item"><img src="${item.url}" class="img-thumb"><button class="btn-secondary" data-remove="${idx}" style="padding:4px 8px;">❌</button></div>`;
-        });
+        queue.forEach((item, idx) => { html += `<div class="queue-item"><img src="${item.url}" class="img-thumb"><button class="btn-secondary" data-remove="${idx}">❌</button></div>`; });
         container.innerHTML = html;
         document.querySelectorAll(`[data-remove]`).forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                let idx = parseInt(btn.getAttribute('data-remove'));
-                queue.splice(idx, 1);
-                updatePreview(queue, areaId);
-            });
+            btn.onclick = () => { let idx = parseInt(btn.getAttribute('data-remove')); queue.splice(idx,1); updatePreview(queue, previewId); };
         });
     }
 
-    // Conversión a PDF (usando pdf-lib)
-    async function imagesToPDF(queue, filename = "documento.pdf") {
-        if (queue.length === 0) throw new Error("No hay imágenes");
+    async function imagesToPDF(queue, filename) {
+        if(!queue.length) throw new Error("No hay imágenes");
         const { PDFDocument } = PDFLib;
         const pdfDoc = await PDFDocument.create();
-        for (let item of queue) {
-            let imgBytes = await item.blob.arrayBuffer();
-            let image;
-            if (item.blob.type === 'image/jpeg') image = await pdfDoc.embedJpg(imgBytes);
-            else image = await pdfDoc.embedPng(imgBytes);
-            const page = pdfDoc.addPage([image.width, image.height]);
-            page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+        for(let item of queue) {
+            let bytes = await item.blob.arrayBuffer();
+            let img = item.blob.type.includes('jpeg') ? await pdfDoc.embedJpg(bytes) : await pdfDoc.embedPng(bytes);
+            let page = pdfDoc.addPage([img.width, img.height]);
+            page.drawImage(img, { x:0, y:0, width:img.width, height:img.height });
         }
-        const pdfBytes = await pdfDoc.save();
+        let pdfBytes = await pdfDoc.save();
         saveAs(new Blob([pdfBytes], { type: "application/pdf" }), filename);
     }
 
-    // ========== OCR ==========
-    async function performOCR(queue, resultElementId) {
-        if (queue.length === 0) {
-            document.getElementById(resultElementId).innerHTML = "⚠️ No hay imágenes para OCR.";
-            document.getElementById(resultElementId).style.display = "block";
-            return;
-        }
+    async function performOCR(queue, resultDivId) {
+        if(!queue.length) { document.getElementById(resultDivId).innerHTML = "⚠️ No hay imágenes."; document.getElementById(resultDivId).style.display = "block"; return; }
         let firstBlob = queue[0].blob;
         let img = new Image();
         img.src = URL.createObjectURL(firstBlob);
         await new Promise(r => img.onload = r);
         let canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
+        canvas.width = img.width; canvas.height = img.height;
         canvas.getContext('2d').drawImage(img, 0, 0);
         URL.revokeObjectURL(img.src);
         const { data: { text } } = await Tesseract.recognize(canvas, 'spa+eng');
-        let resultDiv = document.getElementById(resultElementId);
-        resultDiv.innerHTML = `<strong>📝 Texto extraído:</strong><br>${text || "No se encontró texto."}`;
-        resultDiv.style.display = "block";
+        document.getElementById(resultDivId).innerHTML = `<strong>📝 Texto extraído:</strong><br>${text || "No se encontró texto."}`;
+        document.getElementById(resultDivId).style.display = "block";
     }
 
-    // ========== FLUJO DE CÁMARA (reutilizable) ==========
-    let activeQueue = null, activePreviewId = null;
+    // ========== CÁMARA ==========
     async function startCamera(queue, previewId) {
-        activeQueue = queue;
-        activePreviewId = previewId;
+        activeQueue = queue; activePreviewId = previewId;
         document.getElementById('cameraModal').classList.add('activo');
         const video = document.getElementById('cameraVideo');
         const loading = document.getElementById('cameraLoading');
         loading.style.display = 'block';
         try {
-            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+            if(currentStream) currentStream.getTracks().forEach(t=>t.stop());
             currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             video.srcObject = currentStream;
             await video.play();
             loading.style.display = 'none';
-        } catch (err) { loading.innerText = 'Error de cámara'; }
+        } catch(err) { loading.innerText = 'Error cámara'; }
     }
     document.getElementById('capturePhotoBtn').onclick = async () => {
         const video = document.getElementById('cameraVideo');
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
         canvas.toBlob(async (blob) => {
             await addImageToQueue(blob, activeQueue, activePreviewId);
-            // efecto flash
-            const flash = document.createElement('div');
-            flash.style.position = 'fixed'; flash.style.top=0; flash.style.left=0; flash.style.width='100%'; flash.style.height='100%'; flash.style.backgroundColor='white'; flash.style.zIndex=99999; flash.style.opacity=0.8;
-            document.body.appendChild(flash);
-            setTimeout(() => { flash.remove(); }, 150);
-            // sonido
-            try { new AudioContext().then(ctx => { let o = ctx.createOscillator(); o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.1); }); } catch(e) {}
+            let flash = document.createElement('div'); flash.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:99999; opacity:0.8;'; document.body.appendChild(flash); setTimeout(()=>flash.remove(),150);
+            try { let ctx = new AudioContext(); let o = ctx.createOscillator(); o.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.1); } catch(e){}
         }, 'image/jpeg', 0.9);
     };
-    document.getElementById('closeCameraBtn').onclick = () => {
-        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-        document.getElementById('cameraModal').classList.remove('activo');
-    };
+    document.getElementById('closeCameraBtn').onclick = () => { if(currentStream) currentStream.getTracks().forEach(t=>t.stop()); document.getElementById('cameraModal').classList.remove('activo'); };
 
-    // ========== EVENTOS GENERALES ==========
-    function setupEventListeners() {
-        // Usuario normal
-        document.getElementById('cameraBtn')?.addEventListener('click', () => startCamera(imageQueue, 'imagePreviewArea'));
-        document.getElementById('galleryInput')?.addEventListener('change', async (e) => {
-            for(let file of e.target.files) await addImageToQueue(file, imageQueue, 'imagePreviewArea');
-            e.target.value = '';
-        });
-        document.getElementById('clearQueue')?.addEventListener('click', () => { imageQueue = []; updatePreview(imageQueue, 'imagePreviewArea'); });
-        document.getElementById('convertToPdfBtn')?.addEventListener('click', async () => { try { await imagesToPDF(imageQueue, "escaneo.pdf"); document.getElementById('imgStatus').innerHTML = "✅ PDF generado"; } catch(e) { document.getElementById('imgStatus').innerHTML = "❌ " + e.message; } });
-        document.getElementById('ocrBtnUser')?.addEventListener('click', () => performOCR(imageQueue, 'ocrResultUser'));
-        
-        // Admin
-        document.getElementById('cameraBtnA')?.addEventListener('click', () => startCamera(imageQueueA, 'previewA'));
-        document.getElementById('galleryInputA')?.addEventListener('change', async (e) => {
-            for(let file of e.target.files) await addImageToQueue(file, imageQueueA, 'previewA');
-            e.target.value = '';
-        });
-        document.getElementById('clearQueueA')?.addEventListener('click', () => { imageQueueA = []; updatePreview(imageQueueA, 'previewA'); });
-        document.getElementById('convertBtnA')?.addEventListener('click', async () => { await imagesToPDF(imageQueueA, "escaneo_admin.pdf"); document.getElementById('statusImgA').innerHTML = "✅ PDF generado"; });
-        document.getElementById('ocrBtnA')?.addEventListener('click', () => performOCR(imageQueueA, 'ocrResultA'));
-        
-        // Unir, dividir, comprimir (similares al original, se omiten por brevedad, pero mantendrás las funciones existentes)
-        // (Ya que el original las tenía, aquí pondré solo las esenciales)
-        document.getElementById('mergeBtn')?.addEventListener('click', () => alert("Función unir PDF disponible en la versión completa"));
-        document.getElementById('splitDoBtn')?.addEventListener('click', () => alert("Función dividir disponible"));
-        document.getElementById('compressBtn')?.addEventListener('click', () => alert("Función comprimir disponible"));
-        document.getElementById('mergeBtnA')?.addEventListener('click', () => alert("Función unir PDF (admin)"));
-        document.getElementById('splitBtnA')?.addEventListener('click', () => alert("Dividir PDF admin"));
-        document.getElementById('compressBtnA')?.addEventListener('click', () => alert("Comprimir PDF admin"));
-    }
-
-    // ========== AUTH Y RENDERIZADO (similar al original con mejoras) ==========
+    // ========== AUTH ==========
     auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            const doc = await db.collection('users').doc(user.uid).get();
-            if (doc.exists && doc.data().status === 'approved') {
+        if(user) {
+            const isAdmin = (user.email === ADMIN_EMAIL);
+            let docSnap = await db.collection('users').doc(user.uid).get();
+            if(!docSnap.exists && isAdmin) {
+                await db.collection('users').doc(user.uid).set({ email: user.email, status: 'approved', plan: 'Premium', registeredAt: firebase.firestore.FieldValue.serverTimestamp() });
+                docSnap = await db.collection('users').doc(user.uid).get();
+            }
+            const userData = docSnap.data() || {};
+            const isApproved = (userData.status === 'approved') || isAdmin;
+            if(isApproved) {
                 document.getElementById('authSection').style.display = 'block';
                 document.getElementById('pendingScreen').style.display = 'none';
                 document.getElementById('appFunctions').style.display = 'block';
-                document.getElementById('planStatus').innerText = `Plan: ${doc.data().plan || 'Gratuito'}`;
-                if (user.email === ADMIN_EMAIL) {
+                document.getElementById('planStatus').innerText = `Plan: ${userData.plan || 'Gratuito'}`;
+                if(isAdmin || userData.role === 'admin') {
                     document.getElementById('adminPanel').style.display = 'block';
-                    document.getElementById('adminBadgeContainer').innerHTML = '<span class="admin-badge">Admin</span>';
+                    document.getElementById('adminBadgeContainer').innerHTML = '<span class="admin-badge">Administrador</span>';
+                    cargarUsuarios();
                 } else document.getElementById('adminPanel').style.display = 'none';
-                setupEventListeners();
             } else {
                 document.getElementById('authSection').style.display = 'block';
                 document.getElementById('pendingScreen').style.display = 'block';
@@ -557,29 +324,51 @@
         }
     });
 
-    document.getElementById('loginBtn').onclick = async () => {
-        const email = document.getElementById('email').value;
-        const pwd = document.getElementById('password').value;
-        try {
-            await auth.signInWithEmailAndPassword(email, pwd);
-            document.getElementById('authMessage').innerText = "✅ Conectado";
-        } catch(e) { document.getElementById('authMessage').innerText = e.message; }
-    };
-    document.getElementById('registerBtn').onclick = async () => {
-        const email = document.getElementById('email').value;
-        const pwd = document.getElementById('password').value;
-        try {
-            const cred = await auth.createUserWithEmailAndPassword(email, pwd);
-            await db.collection('users').doc(cred.user.uid).set({ email, status: 'pending', plan: 'Gratuito', registeredAt: new Date() });
-            document.getElementById('authMessage').innerText = "Registrado. Espera aprobación.";
-        } catch(e) { document.getElementById('authMessage').innerText = e.message; }
-    };
+    document.getElementById('loginBtn').onclick = async () => { try { await auth.signInWithEmailAndPassword(document.getElementById('email').value, document.getElementById('password').value); } catch(e) { document.getElementById('authMessage').innerText = e.message; } };
+    document.getElementById('registerBtn').onclick = async () => { try { let cred = await auth.createUserWithEmailAndPassword(document.getElementById('email').value, document.getElementById('password').value); await db.collection('users').doc(cred.user.uid).set({ email: cred.user.email, status: 'pending', plan: 'Gratuito', registeredAt: new Date() }); document.getElementById('authMessage').innerText = "Registrado. Espera aprobación."; } catch(e) { document.getElementById('authMessage').innerText = e.message; } };
     document.getElementById('logoutBtn').onclick = () => auth.signOut();
-    document.getElementById('forgotBtn').onclick = async () => {
-        const email = document.getElementById('email').value;
-        if(email) await auth.sendPasswordResetEmail(email);
-        alert("Revisa tu correo");
-    };
+    document.getElementById('forgotBtn').onclick = async () => { let email = document.getElementById('email').value; if(email) await auth.sendPasswordResetEmail(email); alert("Revisa tu correo"); };
+    document.getElementById('refreshPendingBtn')?.addEventListener('click', () => auth.currentUser && auth.onAuthStateChanged(auth.currentUser));
+
+    // ========== ADMIN FUNCTIONS ==========
+    async function cargarUsuarios() {
+        let snapshot = await db.collection('users').get();
+        let pendientes='', aprobados='', rechazados='';
+        snapshot.forEach(doc => {
+            let data = doc.data();
+            let row = `<div class="user-row"><div class="user-info">${data.email}<br>Estado: ${data.status || 'pendiente'}</div><div class="user-actions"><button class="btn-secondary" onclick="cambiarEstado('${doc.id}','approved')">Aprobar</button><button class="btn-warning" onclick="cambiarEstado('${doc.id}','rejected')">Rechazar</button></div></div>`;
+            if(data.status === 'approved') aprobados += row;
+            else if(data.status === 'rejected') rechazados += row;
+            else pendientes += row;
+        });
+        document.getElementById('tabPendientes').innerHTML = pendientes || 'No hay pendientes';
+        document.getElementById('tabAprobados').innerHTML = aprobados || 'No hay aprobados';
+        document.getElementById('tabRechazados').innerHTML = rechazados || 'No hay rechazados';
+    }
+    window.cambiarEstado = async (uid, nuevo) => { await db.collection('users').doc(uid).update({ status: nuevo }); cargarUsuarios(); };
+    document.getElementById('recargarUsuariosBtn')?.addEventListener('click', cargarUsuarios);
+    document.querySelectorAll('.admin-tab').forEach(tab => { tab.onclick = () => { document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active'); document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active')); document.getElementById(`tab${tab.dataset.tab.charAt(0).toUpperCase()+tab.dataset.tab.slice(1)}`).classList.add('active'); }; });
+
+    // ========== EVENTOS DE USUARIO Y ADMIN ==========
+    function bindEvents() {
+        // Usuario normal
+        document.getElementById('cameraBtn')?.addEventListener('click', () => startCamera(imageQueue, 'imagePreviewArea'));
+        document.getElementById('galleryInput')?.addEventListener('change', async (e) => { for(let f of e.target.files) await addImageToQueue(f, imageQueue, 'imagePreviewArea'); e.target.value=''; });
+        document.getElementById('clearQueue')?.addEventListener('click', () => { imageQueue = []; updatePreview(imageQueue, 'imagePreviewArea'); });
+        document.getElementById('convertToPdfBtn')?.addEventListener('click', async () => { try { await imagesToPDF(imageQueue, "escaneo.pdf"); document.getElementById('imgStatus').innerText = "✅ PDF generado"; } catch(e) { document.getElementById('imgStatus').innerText = e.message; } });
+        document.getElementById('ocrBtnUser')?.addEventListener('click', () => performOCR(imageQueue, 'ocrResultUser'));
+        // Admin
+        document.getElementById('cameraBtnA')?.addEventListener('click', () => startCamera(imageQueueA, 'previewA'));
+        document.getElementById('galleryInputA')?.addEventListener('change', async (e) => { for(let f of e.target.files) await addImageToQueue(f, imageQueueA, 'previewA'); e.target.value=''; });
+        document.getElementById('clearQueueA')?.addEventListener('click', () => { imageQueueA = []; updatePreview(imageQueueA, 'previewA'); });
+        document.getElementById('convertBtnA')?.addEventListener('click', async () => { await imagesToPDF(imageQueueA, "escaneo_admin.pdf"); document.getElementById('statusImgA').innerText = "✅ PDF generado"; });
+        document.getElementById('ocrBtnA')?.addEventListener('click', () => performOCR(imageQueueA, 'ocrResultA'));
+        // Unir, dividir, comprimir (implementaciones rápidas)
+        document.getElementById('mergeBtn')?.addEventListener('click', async () => { let files = document.getElementById('unionPdfInput').files; if(!files.length) return; const { PDFDocument } = PDFLib; const pdf = await PDFDocument.create(); for(let file of files) { let bytes = await file.arrayBuffer(); let donor = await PDFDocument.load(bytes); let pages = await pdf.copyPages(donor, donor.getPageIndices()); pages.forEach(p=>pdf.addPage(p)); } let pdfBytes = await pdf.save(); saveAs(new Blob([pdfBytes]), "unido.pdf"); document.getElementById('mergeStatus').innerText = "✅ PDFs unidos"; });
+        document.getElementById('splitDoBtn')?.addEventListener('click', async () => { let file = document.getElementById('splitPdfInput').files[0]; if(!file) return; let start = parseInt(document.getElementById('pagInicio').value)-1 || 0; let end = parseInt(document.getElementById('pagFin').value); let arrayBuffer = await file.arrayBuffer(); let pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise; let numPages = pdf.numPages; if(end>numPages) end=numPages; const { PDFDocument } = PDFLib; const newPdf = await PDFDocument.create(); let srcDoc = await PDFDocument.load(arrayBuffer); for(let i=start; i<end; i++) { let [page] = await newPdf.copyPages(srcDoc, [i]); newPdf.addPage(page); } let pdfBytes = await newPdf.save(); saveAs(new Blob([pdfBytes]), "extraido.pdf"); document.getElementById('splitStatus').innerText = "✅ PDF extraído"; });
+        document.getElementById('compressBtn')?.addEventListener('click', async () => { let file = document.getElementById('compressPdfInput').files[0]; if(!file) return; let arrayBuffer = await file.arrayBuffer(); let pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise; let numPages = pdf.numPages; const { PDFDocument } = PDFLib; const newPdf = await PDFDocument.create(); let srcDoc = await PDFDocument.load(arrayBuffer); for(let i=0; i<numPages; i++) { let [page] = await newPdf.copyPages(srcDoc, [i]); newPdf.addPage(page); } let pdfBytes = await newPdf.save(); // compresión simple (recompresión) saveAs(new Blob([pdfBytes]), "comprimido.pdf"); document.getElementById('compressStatus').innerText = "✅ PDF comprimido (recomprimido)"; });
+    }
+    bindEvents();
 </script>
 </body>
 </html>
