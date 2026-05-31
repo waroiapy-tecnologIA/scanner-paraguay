@@ -847,13 +847,21 @@ function avatarBg(uid){ const h=[...uid].reduce((a,c)=>a+c.charCodeAt(0),0); con
 onAuthStateChanged(auth, async user => {
   if (!user) { showAuthGate(); return; }
   setLoginLoading(true);
+
+  // Mostrar UID en consola para debug
+  console.log('UID del usuario:', user.uid, '|', user.email);
+
   try {
-    // Intentar como admin primero
-    let isAdmin = false;
-    try {
-      const adminSnap = await getDoc(doc(db, 'admins', user.uid));
-      isAdmin = adminSnap.exists();
-    } catch(e) { console.warn('admins check failed:', e.code); }
+    const [adminSnap, userSnap] = await Promise.allSettled([
+      getDoc(doc(db, 'admins', user.uid)),
+      getDoc(doc(db, 'users',  user.uid))
+    ]);
+
+    console.log('admin result:', adminSnap.status, adminSnap.value?.exists?.());
+    console.log('user  result:', userSnap.status,  userSnap.value?.exists?.());
+
+    const isAdmin = adminSnap.status === 'fulfilled' && adminSnap.value.exists();
+    const hasUser = userSnap.status  === 'fulfilled' && userSnap.value.exists();
 
     if (isAdmin) {
       $('sbAdminSection').style.display = 'block';
@@ -864,30 +872,32 @@ onAuthStateChanged(auth, async user => {
       return;
     }
 
-    // Intentar como usuario regular
-    let userSnap = null;
-    try {
-      userSnap = await getDoc(doc(db, 'users', user.uid));
-    } catch(e) { console.warn('users check failed:', e.code); }
-
-    if (userSnap && userSnap.exists()) {
-      const data = userSnap.data();
+    if (hasUser) {
+      const data = userSnap.value.data();
+      console.log('user data:', JSON.stringify(data));
       if (data.suspended) { setLoginLoading(false); showDenied('suspended'); return; }
       if (data.expiresAt) {
         const exp = data.expiresAt.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
+        console.log('expira:', exp.toISOString(), 'ahora:', new Date().toISOString());
         if (exp < new Date()) { setLoginLoading(false); showDenied('expired'); return; }
       }
-      try { await updateDoc(doc(db, 'users', user.uid), { lastActive: serverTimestamp() }); } catch(e){}
+      try { await updateDoc(doc(db, 'users', user.uid), { lastActive: serverTimestamp() }); } catch(e){ console.warn('lastActive error:', e); }
       setLoginLoading(false);
       startApp();
-    } else {
-      setLoginLoading(false);
-      showDenied('no-account');
+      return;
     }
-  } catch(e) {
-    console.error('Auth check error:', e);
+
+    // Ninguno encontrado — mostrar error detallado
+    const adminErr = adminSnap.status === 'rejected' ? adminSnap.reason?.code : 'not found';
+    const userErr  = userSnap.status  === 'rejected' ? userSnap.reason?.code  : 'not found';
+    console.error('acceso denegado — admin:', adminErr, '| user:', userErr);
     setLoginLoading(false);
-    $('authError').textContent = '❌ Error al verificar acceso: ' + e.message;
+    showDenied('no-account', adminErr + ' / ' + userErr);
+
+  } catch(e) {
+    console.error('Auth check fatal:', e);
+    setLoginLoading(false);
+    $('authError').textContent = '❌ ' + (e.code || e.message);
     $('authError').style.display = 'block';
     auth.signOut();
   }
@@ -906,9 +916,11 @@ function showAuthGate(){
   $('adminPanel').classList.remove('show');
   $('adFab').style.display = 'none';
 }
-function showDenied(reason){
+function showDenied(reason, detail=''){
   const msgs = { expired:'⏰ Tu acceso ha vencido. Contacta al administrador.', suspended:'🚫 Tu cuenta está suspendida. Contacta al administrador.', 'no-account':'⛔ Sin acceso registrado. Contacta al administrador.' };
-  const n = $('authNotice'); n.textContent = msgs[reason]||msgs['no-account']; n.style.display='block';
+  const n = $('authNotice');
+  n.textContent = (msgs[reason]||msgs['no-account']) + (detail ? ' ['+detail+']' : '');
+  n.style.display='block';
   $('authError').style.display='none'; $('authGate').style.display='flex';
   auth.signOut();
 }
