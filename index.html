@@ -25,6 +25,10 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text)}
 
+/* ── APP SHELL ── */
+#appShell{display:none}
+#appShell.ready{display:block}
+
 /* ── CÁMARA ── */
 #cameraView{position:fixed;inset:0;z-index:0}
 #video{width:100%;height:100%;object-fit:cover}
@@ -272,6 +276,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 <!-- ══════════════════════════════════════
      SCANNER APP
 ══════════════════════════════════════ -->
+<div id="appShell">
 <div id="cameraView"><video id="video" autoplay playsinline muted></video></div>
 <canvas id="photoCanvas" style="display:none"></canvas>
 
@@ -405,6 +410,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
     <button class="btn btn-ghost" id="galleryClearBtn" style="margin:0;border:1px solid var(--border)">Limpiar todo</button>
   </div>
 </div>
+
+</div><!-- /appShell -->
 
 <div id="toast"></div>
 
@@ -791,6 +798,7 @@ function showToast(msg){ const t=document.getElementById('toast');t.textContent=
 
 function startApp(){
   document.getElementById('authGate').style.display='none';
+  document.getElementById('appShell').classList.add('ready');
   initCamera('environment');
   renderSplitRanges();
 }
