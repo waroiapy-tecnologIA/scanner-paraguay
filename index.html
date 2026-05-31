@@ -781,27 +781,32 @@ document.getElementById('doConvertBtn').addEventListener('click',async()=>{
   try{const{PDFDocument}=PDFLib;const sizes={A4:[595,842],letter:[612,792],legal:[612,1008]};const sizeKey=document.getElementById('convertSize').value;const pdf=await PDFDocument.create();for(const f of files){const bytes=await readAsBuffer(f);let emb;const t=f.type;if(t==='image/jpeg'||t==='image/jpg') emb=await pdf.embedJpg(bytes).catch(()=>pdf.embedPng(bytes));else emb=await pdf.embedPng(bytes).catch(()=>pdf.embedJpg(bytes));let pgW,pgH;if(sizeKey==='fit'){pgW=emb.width;pgH=emb.height;}else[pgW,pgH]=sizes[sizeKey];const page=pdf.addPage([pgW,pgH]);const scale=Math.min(pgW/emb.width,pgH/emb.height,1);const iW=emb.width*scale,iH=emb.height*scale;page.drawImage(emb,{x:(pgW-iW)/2,y:(pgH-iH)/2,width:iW,height:iH});}downloadPDF(await pdf.save(),'convertido.pdf');showToast(`✅ ${files.length} imagen(es) convertidas`);closePanel('Convert');}catch(e){showToast('❌ Error al convertir');}
 });
 
-// UI helpers
-const sidebar=document.getElementById('sidebar'); const sidebarOverlay=document.getElementById('sidebarOverlay');
-document.getElementById('menuBtn').addEventListener('click',()=>{sidebar.classList.add('open');sidebarOverlay.classList.add('open');});
-function closeSidebar(){sidebar.classList.remove('open');sidebarOverlay.classList.remove('open');}
-document.getElementById('closeSidebar').addEventListener('click',closeSidebar);
-sidebarOverlay.addEventListener('click',closeSidebar);
-function openPanel(id){document.getElementById('panel'+id).classList.add('open');document.getElementById('overlay'+id).classList.add('open');closeSidebar();}
-function closePanel(id){document.getElementById('panel'+id).classList.remove('open');document.getElementById('overlay'+id).classList.remove('open');}
-document.querySelectorAll('.closePanel').forEach(b=>b.addEventListener('click',()=>closePanel(b.dataset.panel)));
-['Merge','Split','Compress','Convert'].forEach(id=>{document.getElementById('overlay'+id).addEventListener('click',()=>closePanel(id));});
-document.getElementById('sbMerge').addEventListener('click',()=>openPanel('Merge'));
-document.getElementById('sbSplit').addEventListener('click',()=>openPanel('Split'));
-document.getElementById('sbCompress').addEventListener('click',()=>openPanel('Compress'));
-document.getElementById('sbConvert').addEventListener('click',()=>openPanel('Convert'));
-
 let toastTimer=null;
 function showToast(msg){ const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2800); }
+
+function openPanel(id){document.getElementById('panel'+id).classList.add('open');document.getElementById('overlay'+id).classList.add('open');if(typeof closeSidebar==='function')closeSidebar();}
+function closePanel(id){document.getElementById('panel'+id).classList.remove('open');document.getElementById('overlay'+id).classList.remove('open');}
 
 function startApp(){
   document.getElementById('authGate').style.display='none';
   document.getElementById('appShell').classList.add('ready');
+
+  // Registrar todos los listeners DESPUÉS de que la app es visible
+  const sidebar=document.getElementById('sidebar');
+  const sidebarOverlay=document.getElementById('sidebarOverlay');
+  function closeSidebar(){sidebar.classList.remove('open');sidebarOverlay.classList.remove('open');}
+  window.closeSidebar = closeSidebar;
+
+  document.getElementById('menuBtn').addEventListener('click',()=>{sidebar.classList.add('open');sidebarOverlay.classList.add('open');});
+  document.getElementById('closeSidebar').addEventListener('click',closeSidebar);
+  sidebarOverlay.addEventListener('click',closeSidebar);
+  document.querySelectorAll('.closePanel').forEach(b=>b.addEventListener('click',()=>closePanel(b.dataset.panel)));
+  ['Merge','Split','Compress','Convert'].forEach(id=>{document.getElementById('overlay'+id).addEventListener('click',()=>closePanel(id));});
+  document.getElementById('sbMerge').addEventListener('click',()=>openPanel('Merge'));
+  document.getElementById('sbSplit').addEventListener('click',()=>openPanel('Split'));
+  document.getElementById('sbCompress').addEventListener('click',()=>openPanel('Compress'));
+  document.getElementById('sbConvert').addEventListener('click',()=>openPanel('Convert'));
+
   initCamera('environment');
   renderSplitRanges();
 }
